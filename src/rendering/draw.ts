@@ -124,17 +124,43 @@ export function drawTrack(
   ctx.stroke();
 }
 
+export interface CarSnapshot {
+  x: number;
+  y: number;
+  heading: number;
+  brake: number;
+  color?: string;
+}
+
 export function drawCar(
   ctx: CanvasRenderingContext2D,
   car: CarState,
   cam: CameraFit,
 ): void {
+  drawCarSnapshot(
+    ctx,
+    {
+      x: car.position.x,
+      y: car.position.y,
+      heading: car.heading,
+      brake: car.inputBrake,
+      color: car.config.color,
+    },
+    cam,
+  );
+}
+
+export function drawCarSnapshot(
+  ctx: CanvasRenderingContext2D,
+  snap: CarSnapshot,
+  cam: CameraFit,
+): void {
   const len = 4.5;
   const wid = 1.9;
-  const color = car.config.color ?? "#60a5fa";
+  const color = snap.color ?? "#60a5fa";
   ctx.save();
-  ctx.translate(car.position.x, car.position.y);
-  ctx.rotate(car.heading);
+  ctx.translate(snap.x, snap.y);
+  ctx.rotate(snap.heading);
   // Body
   ctx.fillStyle = color;
   ctx.strokeStyle = "rgba(0,0,0,0.6)";
@@ -147,8 +173,8 @@ export function drawCar(
   roundRect(ctx, len / 2 - 0.7, -wid / 4, 0.7, wid / 2, 0.2);
   ctx.fill();
   // Brake glow
-  if (car.inputBrake > 0.2) {
-    ctx.fillStyle = `rgba(248, 113, 113, ${Math.min(1, car.inputBrake)})`;
+  if (snap.brake > 0.2) {
+    ctx.fillStyle = `rgba(248, 113, 113, ${Math.min(1, snap.brake)})`;
     roundRect(ctx, -len / 2, -wid / 2, 0.5, wid, 0.1);
     ctx.fill();
   }

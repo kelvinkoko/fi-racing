@@ -2,17 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { Garage } from "./ui/Garage";
 import { Grid, type GridStartConfig } from "./ui/Grid";
 import { Race } from "./ui/Race";
+import { Replay } from "./ui/Replay";
 import { loadGarage, saveGarage, type GarageEntry } from "./lib/storage";
 import type { CarEntry } from "./sim/race/engine";
+import type { RaceRecording } from "./sim/race/recorder";
 
-type View = "garage" | "grid" | "race";
+type View = "garage" | "grid" | "race" | "replay";
 
 export function App(): JSX.Element {
   const [view, setView] = useState<View>("grid");
   const [garage, setGarage] = useState<GarageEntry[]>(() => loadGarage());
   const [startCfg, setStartCfg] = useState<GridStartConfig | null>(null);
+  const [recording, setRecording] = useState<RaceRecording | null>(null);
 
-  // Persist garage on every change.
   useEffect(() => {
     saveGarage(garage);
   }, [garage]);
@@ -47,11 +49,7 @@ export function App(): JSX.Element {
       </header>
 
       {view === "garage" && (
-        <Garage
-          entries={garage}
-          onChange={setGarage}
-          onDone={() => setView("grid")}
-        />
+        <Garage entries={garage} onChange={setGarage} onDone={() => setView("grid")} />
       )}
 
       {view === "grid" && (
@@ -61,6 +59,7 @@ export function App(): JSX.Element {
           onOpenGarage={() => setView("garage")}
           onStart={(cfg) => {
             setStartCfg(cfg);
+            setRecording(null);
             setView("race");
           }}
         />
@@ -72,6 +71,22 @@ export function App(): JSX.Element {
           seed={startCfg.seed}
           laps={startCfg.laps}
           onBack={() => setView("grid")}
+          onFinish={(r) => {
+            setRecording(r);
+            setView("replay");
+          }}
+        />
+      )}
+
+      {view === "replay" && recording && (
+        <Replay
+          recording={recording}
+          cars={raceCars}
+          onBack={() => setView("grid")}
+          onRaceAgain={() => {
+            setRecording(null);
+            setView("race");
+          }}
         />
       )}
     </div>

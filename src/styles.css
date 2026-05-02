@@ -507,3 +507,96 @@ input[type="range"] {
   font-size: 12px;
   color: var(--muted);
 }
+
+/* ------- Replay ------- */
+
+.replay-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+.replay-track {
+  flex-shrink: 0;
+  height: 38vh;
+  min-height: 220px;
+  background: #0b0f19;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+.replay-track canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.replay-controls input[type="range"] {
+  accent-color: var(--accent);
+}
+.time-readout {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  min-width: 110px;
+  text-align: right;
+}
+.replay-cars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.car-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.car-toggle .meta {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+}
+.charts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px 24px;
+}
+.chart-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.chart-card h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.chart {
+  width: 100%;
+}
+/* uPlot dark-theme tweaks */
+.u-legend {
+  font-size: 11px;
+  color: var(--text);
+}
+.u-legend th,
+.u-legend td {
+  font-weight: 400;
+}
