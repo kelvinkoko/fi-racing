@@ -1,5 +1,6 @@
-// Fixed-timestep race engine. Runs the AI -> physics -> bookkeeping loop for
-// every car. Pure: takes initial state in, returns telemetry out.
+// Fixed-timestep race engine. Two entry points:
+//   - createRaceRunner: stateful, steppable controller for live rendering.
+//   - runRace: headless one-shot for tests / async batch races.
 
 import type { CarConfig } from "@/config/car";
 import type { CarState, RaceConfig, RaceState, Vec2 } from "./state";
@@ -15,12 +16,9 @@ export interface CarEntry {
   config: CarConfig;
 }
 
-const DEFAULT_DT = 1 / 120;
+export const DEFAULT_DT = 1 / 120;
 
-export function createInitialRaceState(
-  cars: CarEntry[],
-  track: PreparedTrack,
-): RaceState {
+export function createInitialRaceState(cars: CarEntry[], track: PreparedTrack): RaceState {
   const grid = track.data.startGrid;
   if (cars.length > grid.length) {
     throw new Error(`Track has ${grid.length} grid slots, ${cars.length} cars provided`);
@@ -45,7 +43,6 @@ function initCarState(entry: CarEntry, pos: Vec2, heading: number): CarState {
     engineRPM: entry.config.engine.idleRPM,
     tireWearFront: 0,
     tireWearRear: 0,
-    // Race start: tires already at near-operating temp (out-lap warm-up).
     tireTempFront: 360,
     tireTempRear: 360,
     inputThrottle: 0,
@@ -58,39 +55,40 @@ function initCarState(entry: CarEntry, pos: Vec2, heading: number): CarState {
   };
 }
 
-export interface RunOptions {
-  /** Hard cap on sim time in seconds (safety net against stuck cars). */
-  maxTime?: number;
-  /** Telemetry sample rate, Hz. */
-  sampleHz?: number;
+export interface RaceRunner {
+  readonly state: RaceState;
+  readonly track: PreparedTrack;
+  readonly raceConfig: RaceConfig;
+  /** Advance the simulation by exactly one fixed-timestep tick. */
+  tick(): void;
+  /** Snapshot telemetry (does not stop the runner). */
+  snapshot(): RaceRecording;
 }
 
-export function runRace(
+export function createRaceRunner(
   cars: CarEntry[],
   track: PreparedTrack,
   raceConfig: RaceConfig,
-  options: RunOptions = {},
-): RaceRecording {
+  options: { sampleHz?: number } = {},
+): RaceRunner {
   const dt = raceConfig.dt || DEFAULT_DT;
-  const maxTime = options.maxTime ?? 60 * 30; // 30 minutes safety cap
   const recorder = new TelemetryRecorder(cars.map((c) => c.id), options.sampleHz ?? 30);
-
   const state = createInitialRaceState(cars, track);
-  // Per-car RNG (forked from race seed by index) so adding/removing cars
-  // doesn't perturb other cars' streams.
+
   const masterRng = createRng(raceConfig.seed);
   const carRngs = new Map<string, Rng>();
   cars.forEach((c, i) => carRngs.set(c.id, masterRng.fork(i + 1)));
 
-  // Seed lap-progress tracking with each car's starting arc-length.
   const prevS = new Map<string, number>();
   for (const car of state.cars) {
     const { s } = projectToCenterline(track, car.position);
     prevS.set(car.id, s);
   }
 
-  while (!state.finished && state.time < maxTime) {
-    // Sort cars by total distance to find car ahead (same lap or different).
+  const tick = (): void => {
+    if (state.finished) return;
+
+    // Sort cars by total distance to find car ahead.
     const ordered = [...state.cars].sort((a, b) => b.totalDistance - a.totalDistance);
     const positionByCar = new Map<string, number>();
     ordered.forEach((c, idx) => positionByCar.set(c.id, idx));
@@ -103,7 +101,6 @@ export function runRace(
         const ahead = ordered[myPos - 1];
         carAheadDistance = dist(car.position, ahead.position);
       }
-
       const inputs = decideInputs(car, {
         track,
         rng: carRngs.get(car.id)!,
@@ -112,28 +109,23 @@ export function runRace(
       stepVehicle(car, inputs, dt);
     }
 
-    // Lap progress: project to centerline and detect wrap.
+    // Lap progress.
     const lapLen = track.lapLength;
     for (const car of state.cars) {
       if (car.finished) continue;
       const { s } = projectToCenterline(track, car.position);
       const prev = prevS.get(car.id)!;
       let delta = s - prev;
-      // Detect wrap (crossed start line going forward).
       if (delta < -lapLen / 2) {
         delta += lapLen;
         car.lap += 1;
       } else if (delta > lapLen / 2) {
-        // Going backwards across line; ignore lap decrement to keep counting sane.
         delta -= lapLen;
       }
       car.lapDistance = s;
       car.totalDistance += Math.max(0, delta);
       prevS.set(car.id, s);
-
-      if (car.lap >= raceConfig.laps) {
-        car.finished = true;
-      }
+      if (car.lap >= raceConfig.laps) car.finished = true;
     }
 
     state.tick += 1;
@@ -141,11 +133,41 @@ export function runRace(
     recorder.onTick(state, dt);
 
     if (state.cars.every((c) => c.finished)) state.finished = true;
-  }
+  };
 
-  const recording = recorder.finish(state);
-  recording.trackId = raceConfig.trackId;
-  recording.seed = raceConfig.seed;
-  recording.laps = raceConfig.laps;
-  return recording;
+  return {
+    state,
+    track,
+    raceConfig,
+    tick,
+    snapshot: () => {
+      const rec = recorder.finish(state);
+      rec.trackId = raceConfig.trackId;
+      rec.seed = raceConfig.seed;
+      rec.laps = raceConfig.laps;
+      return rec;
+    },
+  };
+}
+
+export interface RunOptions {
+  maxTime?: number;
+  sampleHz?: number;
+}
+
+export function runRace(
+  cars: CarEntry[],
+  track: PreparedTrack,
+  raceConfig: RaceConfig,
+  options: RunOptions = {},
+): RaceRecording {
+  const runner = createRaceRunner(cars, track, raceConfig, { sampleHz: options.sampleHz });
+  const dt = raceConfig.dt || DEFAULT_DT;
+  const maxTicks = Math.floor((options.maxTime ?? 60 * 30) / dt);
+  let n = 0;
+  while (!runner.state.finished && n < maxTicks) {
+    runner.tick();
+    n += 1;
+  }
+  return runner.snapshot();
 }

@@ -6,7 +6,7 @@
   "description": "Fi Racing — Formula i. Tune the car. Pick the mind. Watch them race.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
