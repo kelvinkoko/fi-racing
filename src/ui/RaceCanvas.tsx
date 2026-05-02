@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { createRaceRunner, type RaceRunner, DEFAULT_DT } from "@/sim/race/engine";
+import { createRaceRunner, type CarEntry, type RaceRunner, DEFAULT_DT } from "@/sim/race/engine";
 import { prepareTrack } from "@/sim/track/track";
 import { makeOval } from "@/data/tracks/oval";
-import { balancedCar, gripCar, powerCar } from "@/config/presets";
-import type { CarConfig } from "@/config/car";
 import { applyCamera, drawCar, drawTrack, fitCamera } from "@/rendering/draw";
 import type { CarState } from "@/sim/race/state";
+import type { RaceRecording } from "@/sim/race/recorder";
 
-const LAPS = 3;
+export interface RaceCanvasProps {
+  cars: CarEntry[];
+  seed: number;
+  laps: number;
+  onFinish?: (recording: RaceRecording) => void;
+}
 
 interface Standing {
   id: string;
@@ -18,40 +22,23 @@ interface Standing {
   finished: boolean;
 }
 
-function buildCars(): { id: string; config: CarConfig }[] {
-  return [
-    { id: "A", config: { ...balancedCar("Balanced"), color: "#3b82f6", driver: { preset: "safe" } } },
-    { id: "B", config: { ...powerCar("Power"), color: "#ef4444", driver: { preset: "aggressive" } } },
-    { id: "C", config: { ...gripCar("Grip"), color: "#10b981", driver: { preset: "overtaker" } } },
-    { id: "D", config: { ...balancedCar("Steady"), color: "#f59e0b", driver: { preset: "safe" } } },
-  ];
-}
-
-export function RaceCanvas(): JSX.Element {
+export function RaceCanvas({ cars, seed, laps, onFinish }: RaceCanvasProps): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const runnerRef = useRef<RaceRunner | null>(null);
-  const seedRef = useRef<number>(Math.floor(Math.random() * 1_000_000));
-  const finishedAtRef = useRef<number | null>(null);
+  const finishedSentRef = useRef(false);
   const [standings, setStandings] = useState<Standing[]>([]);
-  const [seed, setSeed] = useState(seedRef.current);
-  const [tick, setTick] = useState(0);
-
-  const restart = (newSeed?: number): void => {
-    const s = newSeed ?? Math.floor(Math.random() * 1_000_000);
-    seedRef.current = s;
-    setSeed(s);
-    finishedAtRef.current = null;
-    const track = prepareTrack(makeOval());
-    runnerRef.current = createRaceRunner(buildCars(), track, {
-      trackId: "test-oval",
-      laps: LAPS,
-      seed: s,
-      dt: DEFAULT_DT,
-    });
-  };
+  const [, setRenderTick] = useState(0);
 
   useEffect(() => {
-    restart(seedRef.current);
+    const track = prepareTrack(makeOval());
+    runnerRef.current = createRaceRunner(cars, track, {
+      trackId: "test-oval",
+      laps,
+      seed,
+      dt: DEFAULT_DT,
+    });
+    finishedSentRef.current = false;
+
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
 
@@ -59,7 +46,6 @@ export function RaceCanvas(): JSX.Element {
     let lastWall = performance.now();
     let acc = 0;
     const SIM_DT = DEFAULT_DT;
-    // Cap catch-up to avoid the spiral of death after a tab pause.
     const MAX_STEPS_PER_FRAME = 12;
 
     const resize = (): void => {
@@ -84,15 +70,7 @@ export function RaceCanvas(): JSX.Element {
         steps += 1;
       }
 
-      // Auto-restart 3s after race finishes with a fresh seed.
-      if (runner.state.finished) {
-        if (finishedAtRef.current == null) finishedAtRef.current = now;
-        if (now - finishedAtRef.current > 3000) {
-          restart();
-        }
-      }
-
-      // ----- Draw -----
+      // Draw
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const w = canvas.width;
       const h = canvas.height;
@@ -104,10 +82,15 @@ export function RaceCanvas(): JSX.Element {
       applyCamera(ctx, cam);
       drawTrack(ctx, runner.track, cam);
       for (const car of runner.state.cars) drawCar(ctx, car, cam);
-
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      setTick((t) => (t + 1) % 1_000_000);
+
       setStandings(buildStandings(runner.state.cars));
+      setRenderTick((t) => (t + 1) % 1_000_000);
+
+      if (runner.state.finished && !finishedSentRef.current) {
+        finishedSentRef.current = true;
+        if (onFinish) onFinish(runner.snapshot());
+      }
 
       raf = requestAnimationFrame(frame);
     };
@@ -117,17 +100,19 @@ export function RaceCanvas(): JSX.Element {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
+    // Re-create runner when inputs change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [seed, laps, cars]);
 
-  // Suppress unused-var lint for the render-driver state.
-  void tick;
+  const leadLap = standings[0]?.lap ?? 0;
 
   return (
     <>
       <canvas ref={canvasRef} />
       <div className="hud">
-        <h2>Standings · Lap {currentLap(standings)}/{LAPS}</h2>
+        <h2>
+          Standings · Lap {Math.min(laps, leadLap + 1)}/{laps}
+        </h2>
         {standings.map((s, i) => (
           <div className="row" key={s.id}>
             <span className="swatch" style={{ background: s.color }} />
@@ -139,12 +124,7 @@ export function RaceCanvas(): JSX.Element {
             </span>
           </div>
         ))}
-        <div style={{ marginTop: 8, color: "var(--muted)", fontSize: 11 }}>
-          Seed: {seed}
-        </div>
-      </div>
-      <div className="foot">
-        Tune the car. Pick the mind. Watch them race.
+        <div style={{ marginTop: 8, color: "var(--muted)", fontSize: 11 }}>Seed: {seed}</div>
       </div>
     </>
   );
@@ -161,9 +141,4 @@ function buildStandings(cars: CarState[]): Standing[] {
       speed: Math.max(0, c.velocity.x),
       finished: c.finished,
     }));
-}
-
-function currentLap(standings: Standing[]): number {
-  if (standings.length === 0) return 1;
-  return Math.min(LAPS, Math.max(1, standings[0].lap + 1));
 }
