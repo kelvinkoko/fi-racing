@@ -5,6 +5,7 @@ import { makeOval } from "@/data/tracks/oval";
 import { applyCamera, drawCar, drawTrack, fitCamera } from "@/rendering/draw";
 import type { CarState } from "@/sim/race/state";
 import type { RaceRecording } from "@/sim/race/recorder";
+import type { DriverPreset } from "@/config/car";
 
 export interface RaceCanvasProps {
   cars: CarEntry[];
@@ -17,10 +18,13 @@ interface Standing {
   id: string;
   name: string;
   color: string;
+  preset: DriverPreset;
   lap: number;
   speed: number;
   finished: boolean;
 }
+
+const PRESETS: DriverPreset[] = ["safe", "aggressive", "overtaker"];
 
 export function RaceCanvas({ cars, seed, laps, onFinish }: RaceCanvasProps): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -70,7 +74,6 @@ export function RaceCanvas({ cars, seed, laps, onFinish }: RaceCanvasProps): JSX
         steps += 1;
       }
 
-      // Draw
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const w = canvas.width;
       const h = canvas.height;
@@ -100,9 +103,12 @@ export function RaceCanvas({ cars, seed, laps, onFinish }: RaceCanvasProps): JSX
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-    // Re-create runner when inputs change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seed, laps, cars]);
+
+  const setPreset = (carId: string, preset: DriverPreset): void => {
+    runnerRef.current?.setCarDriverPreset(carId, preset);
+  };
 
   const leadLap = standings[0]?.lap ?? 0;
 
@@ -114,17 +120,32 @@ export function RaceCanvas({ cars, seed, laps, onFinish }: RaceCanvasProps): JSX
           Standings · Lap {Math.min(laps, leadLap + 1)}/{laps}
         </h2>
         {standings.map((s, i) => (
-          <div className="row" key={s.id}>
-            <span className="swatch" style={{ background: s.color }} />
-            <span className="name">
-              {i + 1}. {s.name}
-            </span>
-            <span className="meta">
-              {s.finished ? "FIN" : `${(s.speed * 3.6).toFixed(0)} km/h`}
-            </span>
+          <div className="hud-car" key={s.id}>
+            <div className="row">
+              <span className="swatch" style={{ background: s.color }} />
+              <span className="name">
+                {i + 1}. {s.name}
+              </span>
+              <span className="meta">
+                {s.finished ? "FIN" : `${(s.speed * 3.6).toFixed(0)} km/h`}
+              </span>
+            </div>
+            <div className="seg seg-tight">
+              {PRESETS.map((p) => (
+                <button
+                  key={p}
+                  className={"seg-btn" + (s.preset === p ? " on" : "")}
+                  onClick={() => setPreset(s.id, p)}
+                  disabled={s.finished}
+                  title={`Switch ${s.name} to ${p}`}
+                >
+                  {p[0].toUpperCase() + p.slice(1)}
+                </button>
+              ))}
+            </div>
           </div>
         ))}
-        <div style={{ marginTop: 8, color: "var(--muted)", fontSize: 11 }}>Seed: {seed}</div>
+        <div className="hud-foot">Seed: {seed} · click a style to change AI live</div>
       </div>
     </>
   );
@@ -137,6 +158,7 @@ function buildStandings(cars: CarState[]): Standing[] {
       id: c.id,
       name: c.config.name,
       color: c.config.color ?? "#60a5fa",
+      preset: c.config.driver.preset,
       lap: c.lap,
       speed: Math.max(0, c.velocity.x),
       finished: c.finished,

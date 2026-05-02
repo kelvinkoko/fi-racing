@@ -440,6 +440,28 @@ input[type="range"] {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
 }
+.hud-car {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.hud-car:last-of-type {
+  border-bottom: none;
+}
+.seg-tight {
+  display: flex;
+  margin-top: 4px;
+  margin-left: 18px;
+}
+.seg-tight .seg-btn {
+  flex: 1;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+.hud-foot {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
 
 .postrace {
   position: absolute;

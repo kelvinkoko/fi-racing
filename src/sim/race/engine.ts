@@ -2,7 +2,7 @@
 //   - createRaceRunner: stateful, steppable controller for live rendering.
 //   - runRace: headless one-shot for tests / async batch races.
 
-import type { CarConfig } from "@/config/car";
+import type { CarConfig, DriverPreset } from "@/config/car";
 import type { CarState, RaceConfig, RaceState, Vec2 } from "./state";
 import { stepVehicle } from "../physics/vehicle";
 import { decideInputs } from "../ai/driver";
@@ -63,6 +63,8 @@ export interface RaceRunner {
   tick(): void;
   /** Snapshot telemetry (does not stop the runner). */
   snapshot(): RaceRecording;
+  /** Change a car's driver preset mid-race. Takes effect on the next tick. */
+  setCarDriverPreset(carId: string, preset: DriverPreset): void;
 }
 
 export function createRaceRunner(
@@ -146,6 +148,13 @@ export function createRaceRunner(
       rec.seed = raceConfig.seed;
       rec.laps = raceConfig.laps;
       return rec;
+    },
+    setCarDriverPreset: (carId, preset) => {
+      const car = state.cars.find((c) => c.id === carId);
+      if (!car) return;
+      // Replace the driver block; per-car configs are independent so this
+      // does not affect the original garage entry.
+      car.config = { ...car.config, driver: { preset } };
     },
   };
 }
