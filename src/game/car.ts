@@ -11,7 +11,9 @@ export const SLOT = {
   // (snappier than a real F1 to keep the arcade feel) but won't reach
   // hairpin speeds without braking.
   accel: 220,
-  brake: 420,            // gentler so braking actually takes time and skill
+  brake: 250,            // a touch of trail-braking — feather to slow,
+                         // release to roll. A full pedal still gets you
+                         // down to hairpin speed, just not in an instant.
   drag: 0.40,
   rollingFriction: 35,
   topSpeed: 470,         // ≈ 338 km/h (PX_PER_METER = 5)
