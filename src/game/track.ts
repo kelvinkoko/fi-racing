@@ -153,14 +153,12 @@ export function gridPositions(track: Track, count: number): { pos: Vec2; angle: 
 }
 
 // Sample world-space position + tangent angle at fractional track progress
-// [0,1) and a (possibly fractional) lane index.
+// [0,1) and a (possibly fractional) lane index. Progress is interpreted as
+// a fraction of arc length around the loop, so a constant speed produces
+// constant world-space motion through both straights and tight corners.
 export function sampleAtProgress(track: Track, progress: number, lane: number): { pos: Vec2; angle: number; curvature: number } {
-  const n = track.center.length;
-  const p = ((progress % 1) + 1) % 1;
-  const f = p * n;
-  const i0 = Math.floor(f) % n;
-  const i1 = (i0 + 1) % n;
-  const t = f - Math.floor(f);
+  const arcLen = (((progress % 1) + 1) % 1) * track.totalLength;
+  const { i0, i1, t } = indexAtArc(track, arcLen);
 
   const c0 = track.center[i0];
   const c1 = track.center[i1];
@@ -188,6 +186,26 @@ export function sampleAtProgress(track: Track, progress: number, lane: number): 
   const curvature = k0 + (k1 - k0) * t;
 
   return { pos: { x: px, y: py }, angle, curvature };
+}
+
+// Locate the sample segment containing a given arc-length offset from start.
+// Returns the segment endpoints' indices and the [0,1] interpolation along it.
+function indexAtArc(track: Track, arcLen: number): { i0: number; i1: number; t: number } {
+  const lengths = track.cumulativeLength;
+  const n = lengths.length;
+  // Binary search for the largest i with lengths[i] <= arcLen.
+  let lo = 0, hi = n - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >>> 1;
+    if (lengths[mid] <= arcLen) lo = mid;
+    else hi = mid - 1;
+  }
+  const i0 = lo;
+  const i1 = (i0 + 1) % n;
+  const endArc = i1 === 0 ? track.totalLength : lengths[i1];
+  const segLen = endArc - lengths[i0];
+  const t = segLen > 0 ? Math.max(0, Math.min(1, (arcLen - lengths[i0]) / segLen)) : 0;
+  return { i0, i1, t };
 }
 
 // Convert a fractional lane index to a perpendicular offset (px). Lane indices

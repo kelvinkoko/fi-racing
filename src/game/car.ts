@@ -3,18 +3,21 @@ import { NUM_LANES, sampleAtProgress, Track } from "./track";
 import { Vec2 } from "./spline";
 
 export const SLOT = {
-  accel: 240,            // px/s^2 at full throttle
-  brake: 360,            // px/s^2 when braking
+  accel: 320,            // px/s^2 at full throttle — punchy launch
+  brake: 540,            // px/s^2 when braking — chops speed quickly
   drag: 0.55,            // exponential drag coefficient (per second)
-  rollingFriction: 30,   // gentle deceleration at zero throttle
-  topSpeed: 420,
-  // Centripetal acceleration tolerated before deslot. Smaller = grippier car.
-  maxCentripetal: 9000,  // px / s^2
-  // Visual warning threshold (% of maxCentripetal).
-  warnRatio: 0.85,
+  rollingFriction: 35,   // gentle deceleration at zero throttle
+  topSpeed: 380,
+  // Maximum lateral g the slot tolerates before the car flies off. Smaller
+  // means the car can grip tighter corners; tuned so most corners on this
+  // circuit demand braking from top speed.
+  maxCentripetal: 1500,
+  // Visual warning threshold (% of maxCentripetal). Earlier warning gives
+  // the player time to reach for the brake.
+  warnRatio: 0.7,
   laneSwitchRate: 1.4,   // lanes / second when switching
-  deslotDuration: 1.6,   // seconds before respawn after deslot
-  respawnSpeed: 80,      // speed (px/s) when respawning
+  deslotDuration: 2.4,   // seconds before respawn after deslot — real penalty
+  respawnSpeed: 40,      // speed (px/s) when respawning — must rebuild speed
 };
 
 export type CarInput = {
@@ -167,21 +170,24 @@ export function stepCar(car: Car, track: Track) {
 function triggerDeslot(car: Car, sample: { pos: Vec2; angle: number }, _k: number, outwardSign: number) {
   car.desloted = true;
   car.deslotTimer = SLOT.deslotDuration;
-  // Forward direction at deslot
+  // Forward direction at the moment of deslot.
   const fx = Math.cos(sample.angle);
   const fy = Math.sin(sample.angle);
-  // Outward = perpendicular away from corner apex
+  // Outward = perpendicular away from the corner apex (where centrifugal
+  // force was actually flinging the car).
   const ox = -fy * outwardSign;
   const oy = fx * outwardSign;
-  // Initial velocity = forward speed plus a sideways kick.
+  // Carry most of the forward speed, plus a strong sideways kick — the car
+  // ploughs off-line in the outward direction.
   const v = car.speed;
   car.deslotVel = {
-    x: fx * v * 0.7 + ox * v * 0.55,
-    y: fy * v * 0.7 + oy * v * 0.55
+    x: fx * v * 0.8 + ox * v * 0.95,
+    y: fy * v * 0.8 + oy * v * 0.95
   };
   car.deslotPos = { x: sample.pos.x, y: sample.pos.y };
   car.deslotAngle = sample.angle;
-  car.deslotSpin = (Math.random() * 6 + 4) * outwardSign;
+  // Wild spin so the visual is unmistakable.
+  car.deslotSpin = (Math.random() * 7 + 6) * outwardSign;
   car.speed = 0;
 }
 
