@@ -145,44 +145,94 @@ function drawCurbSegment(
   sign: number,
   segId: number
 ) {
-  const samples = track.center.length;
-  // `to` is the exclusive end coming from drawCurbs; iterate [from, to).
   if (to <= from) return;
-  if (to > samples) to = samples;
+  if (to > track.center.length) to = track.center.length;
 
+  const apexSide = sign > 0 ? 1 : -1;
+  const curbWidth = 14;
+  const tileLengthPx = 18; // target physical length of one red/white tile
+
+  // Build the inner (track-edge) and outer (curb-outside) polylines for
+  // this segment, then walk them by *arc length* so every tile has a
+  // consistent visual size regardless of sample density.
   const edge: Vec2[] = [];
   const outerEdge: Vec2[] = [];
-  const curbWidth = 14;
   for (let k = from; k < to; k++) {
     const t = track.tangents[k];
     const n = perp(t);
-    const apexSide = sign > 0 ? 1 : -1;
-    const base = {
+    edge.push({
       x: track.center[k].x + n.x * track.width * apexSide,
       y: track.center[k].y + n.y * track.width * apexSide
-    };
-    const out = {
-      x: base.x + n.x * curbWidth * apexSide,
-      y: base.y + n.y * curbWidth * apexSide
-    };
-    edge.push(base);
-    outerEdge.push(out);
+    });
+    outerEdge.push({
+      x: track.center[k].x + n.x * (track.width + curbWidth) * apexSide,
+      y: track.center[k].y + n.y * (track.width + curbWidth) * apexSide
+    });
   }
   if (edge.length < 2) return;
-  // Draw alternating red/white tiles along the curb strip.
-  const tiles = Math.max(4, Math.floor((to - from) / 1.2));
-  for (let k = 0; k < tiles; k++) {
-    const a0 = Math.floor((k / tiles) * (edge.length - 1));
-    const a1 = Math.floor(((k + 1) / tiles) * (edge.length - 1));
+
+  // Cumulative arc length along the inner edge.
+  const cum: number[] = [0];
+  for (let k = 1; k < edge.length; k++) {
+    cum.push(cum[k - 1] + Math.hypot(edge[k].x - edge[k - 1].x, edge[k].y - edge[k - 1].y));
+  }
+  const totalArc = cum[cum.length - 1];
+  if (totalArc <= 0) return;
+
+  const tiles = Math.max(4, Math.round(totalArc / tileLengthPx));
+
+  for (let tile = 0; tile < tiles; tile++) {
+    const arcStart = (tile / tiles) * totalArc;
+    const arcEnd = ((tile + 1) / tiles) * totalArc;
+
+    // Locate the sample-index range that this tile spans.
+    let s0 = 0;
+    for (let k = 0; k < cum.length; k++) {
+      if (cum[k] <= arcStart) s0 = k;
+    }
+    let s1 = s0;
+    for (let k = s0; k < cum.length; k++) {
+      if (cum[k] < arcEnd) s1 = k;
+    }
+
+    // Exact start/end points by interpolating between sample chords.
+    const p0i = lerpAlong(edge, cum, arcStart);
+    const p0o = lerpAlong(outerEdge, cum, arcStart);
+    const p1i = lerpAlong(edge, cum, arcEnd);
+    const p1o = lerpAlong(outerEdge, cum, arcEnd);
+
+    // Build a polygon that follows the polyline (rather than a flat chord)
+    // for both inner and outer curb edges between the endpoint pair.
     ctx.beginPath();
-    ctx.moveTo(edge[a0].x, edge[a0].y);
-    ctx.lineTo(outerEdge[a0].x, outerEdge[a0].y);
-    ctx.lineTo(outerEdge[a1].x, outerEdge[a1].y);
-    ctx.lineTo(edge[a1].x, edge[a1].y);
+    ctx.moveTo(p0i.x, p0i.y);
+    for (let k = s0 + 1; k <= s1; k++) ctx.lineTo(edge[k].x, edge[k].y);
+    ctx.lineTo(p1i.x, p1i.y);
+    ctx.lineTo(p1o.x, p1o.y);
+    for (let k = s1; k > s0; k--) ctx.lineTo(outerEdge[k].x, outerEdge[k].y);
+    ctx.lineTo(p0o.x, p0o.y);
     ctx.closePath();
-    ctx.fillStyle = (k + segId) % 2 === 0 ? "#e63a3a" : "#f4f4f4";
+    ctx.fillStyle = (tile + segId) % 2 === 0 ? "#e63a3a" : "#f4f4f4";
     ctx.fill();
   }
+}
+
+function lerpAlong(poly: Vec2[], cum: number[], targetArc: number): Vec2 {
+  const n = poly.length;
+  if (n === 0) return { x: 0, y: 0 };
+  const total = cum[n - 1];
+  if (targetArc <= 0) return { x: poly[0].x, y: poly[0].y };
+  if (targetArc >= total) return { x: poly[n - 1].x, y: poly[n - 1].y };
+  for (let k = 1; k < n; k++) {
+    if (cum[k] >= targetArc) {
+      const segLen = cum[k] - cum[k - 1] || 1;
+      const t = (targetArc - cum[k - 1]) / segLen;
+      return {
+        x: poly[k - 1].x + (poly[k].x - poly[k - 1].x) * t,
+        y: poly[k - 1].y + (poly[k].y - poly[k - 1].y) * t
+      };
+    }
+  }
+  return { x: poly[n - 1].x, y: poly[n - 1].y };
 }
 
 function drawLaneStripes(ctx: CanvasRenderingContext2D, track: Track) {
