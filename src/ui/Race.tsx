@@ -133,12 +133,18 @@ export default function Race({ net, onExit }: Props) {
       if (isHost) {
         hostState = createHostState(players, track, TOTAL_LAPS);
         const startMsg: StartMsg = makeStartMsg(players, TOTAL_LAPS);
+        net!.recordOwnStart(startMsg);
         net!.broadcastStart(startMsg);
         const delay = startMsg.startAt - Date.now();
-        setTimeout(() => { /* host starts simulating after countdown */ }, delay);
         announceCountdown(performance.now() + Math.max(0, delay));
       } else {
         clientView = makeClientView();
+        // Use the start message captured by Lobby (it arrived before Race mounted).
+        const cached = net!.latestStart;
+        if (cached) {
+          const delay = cached.startAt - Date.now();
+          announceCountdown(performance.now() + Math.max(0, delay));
+        }
       }
 
       net!.on({
@@ -165,6 +171,17 @@ export default function Race({ net, onExit }: Props) {
     }
 
     const loop = (now: number) => {
+      try {
+        loopBody(now);
+      } catch (e) {
+        console.error("Race loop crashed", e);
+        setError(`Race loop error: ${(e as Error).message}`);
+        return;
+      }
+      raf = requestAnimationFrame(loop);
+    };
+
+    const loopBody = (now: number) => {
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
 
@@ -253,8 +270,6 @@ export default function Race({ net, onExit }: Props) {
         const data = pickHudData(isMultiplayer, isHost, hostState, clientView, lapState, simTime, players, net?.selfId);
         if (data) setHud(data);
       }
-
-      raf = requestAnimationFrame(loop);
     };
 
     function emitLapToast(lap: LapState) {

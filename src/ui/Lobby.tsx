@@ -15,7 +15,9 @@ export default function Lobby({ net, onStart, onLeave }: Props) {
   useEffect(() => {
     net.on({ onLobby: setLobby });
     net.broadcastHello();
-  }, [net]);
+    const off = net.onStartPersistent(() => onStart());
+    return off;
+  }, [net, onStart]);
 
   const isHost = lobby.hostId === net.selfId;
   const link = `${location.origin}${location.pathname}#r=${net.roomCode}`;

@@ -17,6 +17,8 @@ export type NetEvents = {
 export class NetRoom {
   readonly selfId: string = selfId;
   readonly roomCode: string;
+  latestStart: StartMsg | null = null;
+  private startListeners: Array<(msg: StartMsg, fromId: string) => void> = [];
   private room: Room;
   private events: NetEvents = {};
   private players: Map<string, PlayerInfo> = new Map();
@@ -75,7 +77,11 @@ export class NetRoom {
       this.events.onLobby?.(this.snapshotLobby());
     });
 
-    onStart((msg, peerId) => this.events.onStart?.(msg, peerId));
+    onStart((msg, peerId) => {
+      this.latestStart = msg;
+      this.events.onStart?.(msg, peerId);
+      for (const fn of this.startListeners) fn(msg, peerId);
+    });
     onInput((msg, peerId) => this.events.onInput?.(msg, peerId));
     onSnap((msg) => this.events.onSnapshot?.(msg));
     onChat((msg, peerId) => this.events.onChat?.(msg, peerId));
@@ -94,6 +100,18 @@ export class NetRoom {
   }
 
   on(events: NetEvents) { this.events = { ...this.events, ...events }; }
+
+  // Persistent start subscription that survives screen changes — Lobby uses
+  // this to detect when the host has fired the start message so the client
+  // can transition to the race screen.
+  onStartPersistent(fn: (msg: StartMsg, fromId: string) => void): () => void {
+    this.startListeners.push(fn);
+    return () => {
+      this.startListeners = this.startListeners.filter((f) => f !== fn);
+    };
+  }
+
+  recordOwnStart(msg: StartMsg) { this.latestStart = msg; }
 
   setName(name: string) {
     this.name = name;
