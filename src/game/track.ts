@@ -183,9 +183,26 @@ export function sampleAtProgress(track: Track, progress: number, lane: number): 
   const angle = Math.atan2(tny, tnx);
   const k0 = track.curvature[i0];
   const k1 = track.curvature[i1];
-  const curvature = k0 + (k1 - k0) * t;
+  const kCenter = k0 + (k1 - k0) * t;
+  const curvature = laneAdjustedCurvature(kCenter, offset);
 
   return { pos: { x: px, y: py }, angle, curvature };
+}
+
+// Adjusts a centerline curvature for a perpendicular lane offset. With our
+// perp convention (+offset = inside of a positive-κ turn), the lane on the
+// inside has a tighter radius and therefore higher |κ|; the lane on the
+// outside has a gentler radius and lower |κ|. This is what gives the
+// outer lane an overtaking opportunity through corners.
+//
+//   r_lane = r_center − offset      → κ_lane = κ / (1 − κ·offset)
+//
+// Clamped to avoid the singularity when a lane offset would land at the
+// turn's radius origin (physically the inside lane folding through itself).
+export function laneAdjustedCurvature(kCenter: number, lateralOffset: number): number {
+  const denom = 1 - kCenter * lateralOffset;
+  if (denom <= 0.05) return kCenter / 0.05; // clamp tightly
+  return kCenter / denom;
 }
 
 // Locate the sample segment containing a given arc-length offset from start.
@@ -230,16 +247,19 @@ function laneSpacing(): number {
 }
 
 // Largest absolute curvature found in the next `distance` pixels of arc
-// length ahead of `progress`. Used by the HUD to show the upcoming speed
-// limit before the player gets to the corner.
-export function lookaheadMaxCurvature(track: Track, progress: number, distance: number, samples = 10): number {
+// length ahead of `progress` for the given lane. Used by the HUD to show
+// the upcoming speed limit before the player gets to the corner. Lane is
+// honoured so the outer lane sees a gentler upcoming κ than the inner.
+export function lookaheadMaxCurvature(track: Track, progress: number, distance: number, lane = 1, samples = 10): number {
   const startArc = (((progress % 1) + 1) % 1) * track.totalLength;
+  const offset = laneOffsetValue(lane);
   let maxK = 0;
   const step = distance / Math.max(1, samples - 1);
   for (let i = 0; i < samples; i++) {
     const arc = (startArc + step * i) % track.totalLength;
     const { i0, i1, t } = indexAtArcExternal(track, arc);
-    const k = Math.abs(track.curvature[i0] + (track.curvature[i1] - track.curvature[i0]) * t);
+    const kCenter = track.curvature[i0] + (track.curvature[i1] - track.curvature[i0]) * t;
+    const k = Math.abs(laneAdjustedCurvature(kCenter, offset));
     if (k > maxK) maxK = k;
   }
   return maxK;

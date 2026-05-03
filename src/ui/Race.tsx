@@ -571,8 +571,8 @@ function pickHudData(
 ): HudData | null {
   // Look ~1 second of top-speed travel ahead so the player has time to brake.
   const lookaheadDist = 500;
-  const safeFromProgress = (p: number) => {
-    const k = lookaheadMaxCurvature(track, p, lookaheadDist);
+  const safeFromProgress = (p: number, lane: number) => {
+    const k = lookaheadMaxCurvature(track, p, lookaheadDist, lane);
     return Math.round(maxSafeSpeedFor(k));
   };
   if (!isMp) {
@@ -584,7 +584,7 @@ function pickHudData(
       bestLap: localLap.bestLap,
       total: localSim - localLap.raceStart,
       speed: Math.max(0, Math.round(localCar.speed)),
-      maxSafe: safeFromProgress(localCar.progress),
+      maxSafe: safeFromProgress(localCar.progress, localCar.laneCurrent),
       lane: Math.round(localCar.laneCurrent),
       warning: localCar.warning,
       desloted: localCar.desloted,
@@ -603,7 +603,7 @@ function pickHudData(
       bestLap: me.bestLap,
       total: host.simTime - me.raceStart,
       speed: Math.max(0, Math.round(car?.speed ?? 0)),
-      maxSafe: car ? safeFromProgress(car.progress) : 0,
+      maxSafe: car ? safeFromProgress(car.progress, car.laneCurrent) : 0,
       lane: car ? Math.round(car.laneCurrent) : myLane,
       warning: !!car?.warning,
       desloted: !!car?.desloted,
@@ -622,7 +622,7 @@ function pickHudData(
       bestLap: me.bestMs ? me.bestMs / 1000 : null,
       total: client.simTime,
       speed: Math.max(0, Math.round(c?.speed ?? 0)),
-      maxSafe: c ? safeFromProgress(c.progress) : 0,
+      maxSafe: c ? safeFromProgress(c.progress, myLane) : 0,
       lane: myLane,
       warning: !!c?.warning,
       desloted: !!c?.desloted,
