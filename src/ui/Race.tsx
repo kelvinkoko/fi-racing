@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { buildTrack, gridPositions, lookaheadMaxCurvature, NUM_LANES, Track } from "../game/track";
 import { renderTrackArt } from "../render/trackRender";
+import { buildMiniMapBackground, buildMiniMapProjection, drawMiniMap, MiniDot, MiniMapProjection } from "../render/miniMap";
 import { createCamera, drawScene, followCamera, CarVisual } from "../render/scene";
 import { Car, createSlotCar, KMH_PER_PX_S, maxSafeSpeedFor, renderPose, stepCar } from "../game/car";
 import { Keyboard } from "../input/keyboard";
@@ -49,6 +50,7 @@ export default function Race({ net, onExit }: Props) {
   const brakeRef = useRef<HTMLDivElement | null>(null);
   const laneLeftRef = useRef<HTMLDivElement | null>(null);
   const laneRightRef = useRef<HTMLDivElement | null>(null);
+  const miniMapRef = useRef<HTMLCanvasElement | null>(null);
   const [touch] = useState(() => isTouchDevice());
   const [hud, setHud] = useState<HudData>({
     lap: 1, totalLaps: TOTAL_LAPS, curLap: 0, lastLap: null, bestLap: null, total: 0,
@@ -85,6 +87,19 @@ export default function Race({ net, onExit }: Props) {
 
     const track = step("buildTrack", () => buildTrack(60));
     const art = step("renderTrackArt", () => renderTrackArt(track, 1));
+
+    // Mini-map cached background + projection.
+    const miniW = 168;
+    const miniH = 110;
+    const miniProj: MiniMapProjection = buildMiniMapProjection(track, miniW, miniH);
+    const miniBg = step("renderMiniMap", () => buildMiniMapBackground(track, miniProj));
+    const miniCanvas = miniMapRef.current;
+    const miniCtx = miniCanvas ? miniCanvas.getContext("2d") : null;
+    if (miniCanvas) {
+      miniCanvas.width = miniW;
+      miniCanvas.height = miniH;
+    }
+
     const cam = createCamera();
     const kb = new Keyboard();
     kb.attach();
@@ -323,6 +338,14 @@ export default function Race({ net, onExit }: Props) {
 
       drawScene(ctx, cam, track, art, cars, canvas.clientWidth, canvas.clientHeight);
 
+      if (miniCtx) {
+        const dots: MiniDot[] = cars.map((c) => ({
+          x: c.pos.x, y: c.pos.y, color: c.color,
+          isLocal: !!c.isLocal, desloted: !!c.desloted
+        }));
+        drawMiniMap(miniCtx, miniBg, miniProj, dots);
+      }
+
       hudTick += dt;
       if (hudTick > 0.08) {
         hudTick = 0;
@@ -491,6 +514,9 @@ export default function Race({ net, onExit }: Props) {
           ))}
         </div>
       )}
+      <div className="minimap">
+        <canvas ref={miniMapRef} />
+      </div>
       {countdown && <div className="toast" key={countdown + "-cd"}>{countdown}</div>}
       {toast && !countdown && <div className="toast" key={toast.key}>{toast.text}</div>}
       {touch && (

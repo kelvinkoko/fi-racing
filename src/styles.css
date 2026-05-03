@@ -218,6 +218,24 @@ input[type="text"]:focus { border-color: var(--accent-2); }
 .rank-gap { font-size: 11px; text-align: right; color: var(--muted); }
 .rank-gap.leader { color: var(--ok); font-weight: 700; letter-spacing: 0.5px; }
 
+.minimap {
+  position: absolute;
+  top: 220px;
+  right: 16px;
+  padding: 6px;
+  background: rgba(11, 13, 18, 0.55);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+.minimap canvas {
+  display: block;
+  width: 168px;
+  height: 110px;
+}
+
 /* HUD-right needs to move down so it doesn't overlap the ranking panel. */
 .hud-right { top: auto; right: 16px; bottom: 200px; }
 
