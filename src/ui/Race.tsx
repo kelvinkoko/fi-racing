@@ -536,7 +536,7 @@ function pickHudData(
   track: Track, selfId?: string
 ): HudData | null {
   // Look ~1 second of top-speed travel ahead so the player has time to brake.
-  const lookaheadDist = 380;
+  const lookaheadDist = 500;
   const safeFromProgress = (p: number) => {
     const k = lookaheadMaxCurvature(track, p, lookaheadDist);
     return Math.round(maxSafeSpeedFor(k));

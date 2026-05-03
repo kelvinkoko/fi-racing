@@ -3,15 +3,19 @@ import { NUM_LANES, sampleAtProgress, Track } from "./track";
 import { Vec2 } from "./spline";
 
 export const SLOT = {
-  accel: 320,            // px/s^2 at full throttle
-  brake: 600,            // F1 carbon brakes - ferocious
-  drag: 0.55,            // exponential drag coefficient (per second)
+  // Acceleration / drag tuned so the car reaches ~90% of top speed in ~4s
+  // (snappier than a real F1 to keep the arcade feel) but won't reach
+  // hairpin speeds without braking.
+  accel: 220,
+  brake: 720,            // F1-grade carbon brakes (~5-6g deceleration)
+  drag: 0.40,
   rollingFriction: 35,
-  topSpeed: 420,         // ≈ 302 km/h with PX_PER_METER = 5
-  // Maximum lateral g the slot tolerates before flying off. Smaller =
-  // grippier. Tuned so most corners on this circuit demand braking from
-  // top speed.
-  maxCentripetal: 1900,
+  topSpeed: 470,         // ≈ 338 km/h (PX_PER_METER = 5)
+  // Lateral acceleration ceiling. Real F1 peak is ~5g (≈245 px/s²) but
+  // because aero scales with v² in reality, slow corners get less grip.
+  // Our single-threshold model averages to ~5g for high-speed sweeps and
+  // forces hard braking for tight ones — matching observed F1 cornering.
+  maxCentripetal: 750,
   warnRatio: 0.7,
   laneSwitchRate: 1.4,
   deslotDuration: 2.4,
