@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import { NetRoom } from "../net/room";
 import { CAR_COLORS, LobbyMsg } from "../net/protocol";
 
@@ -11,6 +12,7 @@ type Props = {
 export default function Lobby({ net, onStart, onLeave }: Props) {
   const [lobby, setLobby] = useState<LobbyMsg>(() => net.snapshotLobby());
   const [copied, setCopied] = useState(false);
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
 
   useEffect(() => {
     net.on({ onLobby: setLobby });
@@ -22,6 +24,19 @@ export default function Lobby({ net, onStart, onLeave }: Props) {
   const isHost = lobby.hostId === net.selfId;
   const link = `${location.origin}${location.pathname}#r=${net.roomCode}`;
 
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(link, {
+      margin: 1,
+      width: 220,
+      color: { dark: "#0b0d12", light: "#ffffff" },
+      errorCorrectionLevel: "M"
+    }).then((url) => {
+      if (!cancelled) setQrUrl(url);
+    }).catch((e) => console.error("QR generation failed", e));
+    return () => { cancelled = true; };
+  }, [link]);
+
   return (
     <div className="lobby">
       <div className="card">
@@ -30,6 +45,13 @@ export default function Lobby({ net, onStart, onLeave }: Props) {
           Room <strong style={{ color: "var(--accent-2)", letterSpacing: 2 }}>{net.roomCode}</strong>
           {" · "}{lobby.players.length} / 4 players
         </div>
+
+        {qrUrl && (
+          <div className="qr-wrap">
+            <img src={qrUrl} alt="Scan to join" className="qr" />
+            <div className="qr-caption">Scan to join</div>
+          </div>
+        )}
 
         <div className="players">
           {lobby.players.map((p) => (
