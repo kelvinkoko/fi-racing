@@ -19,31 +19,38 @@ export type Track = {
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
 };
 
-// F1-style fictional layout. Hand-tuned control points form a flowing circuit:
-// long start straight, fast right kink, S-chicane, hairpin, sweeping double-apex,
-// returning down a back straight to the start.
+// F1-style fictional layout. Hand-tuned control points form a flowing
+// circuit: long start/finish straight (with the start line sitting on the
+// straight, like every real F1 track), fast right kink, S-chicane,
+// hairpin, sweeping double-apex, then a 90° left and a back straight that
+// rejoins the start straight.
+//
+// Points 20 → 21 → 0 → 1 are all colinear on y=0 so the start/finish
+// line, the entire grid, and the run-down to turn 1 sit on a 1000+ px
+// uninterrupted straight.
 const CONTROL_POINTS: Vec2[] = [
-  { x: 0,    y: 0    }, // start/finish
-  { x: 600,  y: -20  },
-  { x: 950,  y: -120 }, // fast right kink
-  { x: 1200, y: -340 },
-  { x: 1320, y: -640 },
-  { x: 1180, y: -880 }, // entry to chicane
-  { x: 980,  y: -820 }, // chicane apex 1
-  { x: 880,  y: -640 }, // chicane apex 2
-  { x: 720,  y: -560 },
-  { x: 500,  y: -700 },
-  { x: 280,  y: -940 }, // approach hairpin
-  { x: 120,  y: -1080 },
-  { x: -120, y: -1060 }, // hairpin apex
-  { x: -260, y: -880 },
-  { x: -200, y: -640 }, // sweeping double-apex entry
-  { x: -380, y: -440 },
-  { x: -560, y: -300 },
-  { x: -680, y: -120 },
-  { x: -640, y: 80   },
-  { x: -440, y: 160  },
-  { x: -200, y: 120  },
+  { x: 100,  y: 0    },  // 0  ← START/FINISH (mid-straight)
+  { x: 500,  y: 0    },  // 1  along start straight
+  { x: 750,  y: 0    },  // 2  end of straight — turn-in for T1
+  { x: 1040, y: -180 },  // 3
+  { x: 1280, y: -460 },  // 4
+  { x: 1340, y: -760 },  // 5  far-right corner
+  { x: 1180, y: -940 },  // 6  chicane entry
+  { x: 960,  y: -880 },  // 7  chicane apex 1
+  { x: 850,  y: -680 },  // 8  chicane apex 2
+  { x: 700,  y: -560 },  // 9
+  { x: 460,  y: -680 },  // 10
+  { x: 240,  y: -940 },  // 11 hairpin braking zone
+  { x: 60,   y: -1080 }, // 12
+  { x: -180, y: -1080 }, // 13 hairpin apex
+  { x: -300, y: -880 },  // 14 hairpin exit
+  { x: -220, y: -640 },  // 15
+  { x: -400, y: -440 },  // 16 sweeping double-apex
+  { x: -580, y: -260 },  // 17
+  { x: -680, y: -80  },  // 18
+  { x: -680, y: 100  },  // 19 outer apex of last left
+  { x: -680, y: 0    },  // 20 entry to start straight (after 90°)
+  { x: -300, y: 0    },  // 21 along start straight, before start line
 ];
 
 export function buildTrack(width = 60): Track {
