@@ -42,7 +42,18 @@ export default function Race({ net, onExit }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cleanup: (() => void) | null = null;
+    try {
+      cleanup = setup();
+    } catch (e) {
+      console.error("Race setup crashed", e);
+      setError(`Race setup error: ${(e as Error).message}`);
+    }
+    return () => { cleanup?.(); };
+
+    function setup(): () => void {
     const canvas = canvasRef.current!;
+    if (!canvas) throw new Error("canvas ref missing");
     const ctx = canvas.getContext("2d", { alpha: false })!;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
@@ -66,14 +77,21 @@ export default function Race({ net, onExit }: Props) {
       };
     };
 
-    const resize = () => {
+    const ensureSize = () => {
       const w = canvas.clientWidth, h = canvas.clientHeight;
-      canvas.width = Math.floor(w * dpr);
-      canvas.height = Math.floor(h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const targetW = Math.floor(w * dpr);
+      const targetH = Math.floor(h * dpr);
+      if (targetW > 0 && targetH > 0 && (canvas.width !== targetW || canvas.height !== targetH)) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
     };
-    resize();
-    window.addEventListener("resize", resize);
+    const ro = new ResizeObserver(() => ensureSize());
+    ro.observe(canvas);
+    ensureSize();
+    window.addEventListener("resize", ensureSize);
+    window.addEventListener("orientationchange", ensureSize);
 
     const isMultiplayer = !!net;
     const isHost = isMultiplayer ? net!.isHost() : true;
@@ -182,6 +200,7 @@ export default function Race({ net, onExit }: Props) {
     };
 
     const loopBody = (now: number) => {
+      ensureSize();
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
 
@@ -328,8 +347,11 @@ export default function Race({ net, onExit }: Props) {
       cancelAnimationFrame(raf);
       kb.detach();
       tc.detach();
-      window.removeEventListener("resize", resize);
+      ro.disconnect();
+      window.removeEventListener("resize", ensureSize);
+      window.removeEventListener("orientationchange", ensureSize);
     };
+    } // end setup()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
