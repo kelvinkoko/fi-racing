@@ -219,9 +219,7 @@ input[type="text"]:focus { border-color: var(--accent-2); }
 .rank-gap.leader { color: var(--ok); font-weight: 700; letter-spacing: 0.5px; }
 
 .minimap {
-  position: absolute;
-  top: 220px;
-  right: 16px;
+  margin-top: 8px;
   padding: 6px;
   background: rgba(11, 13, 18, 0.55);
   border: 1px solid rgba(255,255,255,0.08);
@@ -229,6 +227,7 @@ input[type="text"]:focus { border-color: var(--accent-2); }
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   pointer-events: none;
+  width: max-content;
 }
 .minimap canvas {
   display: block;

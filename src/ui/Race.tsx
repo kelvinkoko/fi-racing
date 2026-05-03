@@ -476,6 +476,9 @@ export default function Race({ net, onExit }: Props) {
             <span key={i} className={"lane-pip" + (i === hud.lane ? " on" : "")} />
           ))}
         </div>
+        <div className="minimap">
+          <canvas ref={miniMapRef} />
+        </div>
       </div>
       <div className="hud-right">
         <div className={"speed-big" + speedClass(hud)}>
@@ -514,9 +517,6 @@ export default function Race({ net, onExit }: Props) {
           ))}
         </div>
       )}
-      <div className="minimap">
-        <canvas ref={miniMapRef} />
-      </div>
       {countdown && <div className="toast" key={countdown + "-cd"}>{countdown}</div>}
       {toast && !countdown && <div className="toast" key={toast.key}>{toast.text}</div>}
       {touch && (
