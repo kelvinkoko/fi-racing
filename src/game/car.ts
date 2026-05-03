@@ -15,12 +15,12 @@ export const SLOT = {
   drag: 0.40,
   rollingFriction: 35,
   topSpeed: 470,         // ≈ 338 km/h (PX_PER_METER = 5)
-  // Lateral acceleration ceiling. Real F1 peak is ~5g (≈245 px/s²) but
-  // because aero scales with v² in reality, slow corners get less grip.
-  // Our single-threshold model averages to ~5g for high-speed sweeps and
-  // forces hard braking for tight ones — matching observed F1 cornering.
-  maxCentripetal: 750,
-  warnRatio: 0.7,
+  // Lateral acceleration ceiling. Real F1 peaks near 5g; we sit a bit
+  // above that for arcade forgiveness so a slight overshoot through a
+  // corner doesn't immediately fling you off — only genuinely too fast
+  // attempts deslot.
+  maxCentripetal: 1200,
+  warnRatio: 0.6,        // CORNER! warning fires earlier, more reaction time
   laneSwitchRate: 1.4,
   deslotDuration: 2.4,
   respawnSpeed: 50,
