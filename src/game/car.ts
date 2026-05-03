@@ -205,6 +205,13 @@ export function renderPose(car: Car, alpha: number): { x: number; y: number; ang
   };
 }
 
+// Max speed the slot can sustain at a given absolute curvature without
+// exceeding maxCentripetal. Returns Infinity for straights.
+export function maxSafeSpeedFor(absCurvature: number): number {
+  if (absCurvature < 1e-6) return SLOT.topSpeed;
+  return Math.sqrt(SLOT.maxCentripetal / absCurvature);
+}
+
 export function clampLane(l: number): number {
   if (l < 0) return 0;
   if (l > NUM_LANES - 1) return NUM_LANES - 1;

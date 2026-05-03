@@ -84,14 +84,6 @@ function drawCar(ctx: CanvasRenderingContext2D, car: CarVisual) {
 
   ctx.shadowBlur = 0;
 
-  if (car.isLocal) {
-    ctx.strokeStyle = "rgba(255,255,255,0.85)";
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 22, 12, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
   ctx.restore();
 }
 

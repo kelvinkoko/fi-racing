@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { buildTrack, gridPositions, NUM_LANES } from "../game/track";
+import { buildTrack, gridPositions, lookaheadMaxCurvature, NUM_LANES, Track } from "../game/track";
 import { renderTrackArt } from "../render/trackRender";
 import { createCamera, drawScene, followCamera, CarVisual } from "../render/scene";
-import { Car, createSlotCar, renderPose, stepCar } from "../game/car";
+import { Car, createSlotCar, maxSafeSpeedFor, renderPose, stepCar } from "../game/car";
 import { Keyboard } from "../input/keyboard";
 import { TouchControls, isTouchDevice } from "../input/touch";
 import { SIM_DT } from "../game/constants";
@@ -23,8 +23,8 @@ type Props = { net?: NetRoom; onExit?: () => void };
 
 type HudData = {
   lap: number; totalLaps: number; curLap: number; lastLap: number | null;
-  bestLap: number | null; total: number; speed: number; lane: number;
-  warning: boolean; desloted: boolean; finished: boolean;
+  bestLap: number | null; total: number; speed: number; maxSafe: number;
+  lane: number; warning: boolean; desloted: boolean; finished: boolean;
 };
 
 type StandingsRow = { id: string; name: string; color: string; lap: number; finishMs: number; bestMs: number };
@@ -52,7 +52,7 @@ export default function Race({ net, onExit }: Props) {
   const [touch] = useState(() => isTouchDevice());
   const [hud, setHud] = useState<HudData>({
     lap: 1, totalLaps: TOTAL_LAPS, curLap: 0, lastLap: null, bestLap: null, total: 0,
-    speed: 0, lane: 1, warning: false, desloted: false, finished: false
+    speed: 0, maxSafe: 0, lane: 1, warning: false, desloted: false, finished: false
   });
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   const [countdown, setCountdown] = useState<string | null>(null);
@@ -326,7 +326,7 @@ export default function Race({ net, onExit }: Props) {
       hudTick += dt;
       if (hudTick > 0.08) {
         hudTick = 0;
-        const data = pickHudData(isMultiplayer, isHost, hostState, clientView, lapState, simTime, players, localCar, myDesiredLane, net?.selfId);
+        const data = pickHudData(isMultiplayer, isHost, hostState, clientView, lapState, simTime, players, localCar, myDesiredLane, track, net?.selfId);
         if (data) setHud(data);
         const rank = buildRanking(isMultiplayer, isHost, hostState, clientView, lapState, players, localCar, track.totalLength, net?.selfId);
         setRanking(rank);
@@ -455,10 +455,22 @@ export default function Race({ net, onExit }: Props) {
         </div>
       </div>
       <div className="hud-right">
-        <div className={"speed-big" + (hud.warning ? " warn" : "") + (hud.desloted ? " dead" : "")}>
+        <div className={"speed-big" + speedClass(hud)}>
           {hud.speed}
         </div>
         <div className="speed-unit">PX/S</div>
+        <div className="speed-max">
+          MAX <span className="speed-max-num">{hud.maxSafe || "—"}</span>
+        </div>
+        <div className="speed-bar">
+          <div
+            className="speed-bar-fill"
+            style={{
+              width: `${Math.min(100, (hud.speed / Math.max(hud.maxSafe, 1)) * 100)}%`,
+              background: speedBarColor(hud)
+            }}
+          />
+        </div>
         {hud.warning && !hud.desloted && <div className="warn-text">CORNER!</div>}
         {hud.desloted && <div className="warn-text dead">DESLOT</div>}
       </div>
@@ -499,12 +511,34 @@ export default function Race({ net, onExit }: Props) {
   );
 }
 
+function speedClass(h: HudData): string {
+  if (h.desloted) return " dead";
+  if (h.warning) return " warn";
+  if (h.maxSafe > 0 && h.speed > h.maxSafe) return " warn";
+  return "";
+}
+
+function speedBarColor(h: HudData): string {
+  if (h.desloted) return "#ff445f";
+  const ratio = h.maxSafe > 0 ? h.speed / h.maxSafe : 0;
+  if (ratio >= 1.0) return "#ff445f";
+  if (ratio >= 0.85) return "#ffd23f";
+  return "#36d399";
+}
+
 function pickHudData(
   isMp: boolean, isHost: boolean,
   host: HostState | null, client: ClientView | null,
   localLap: LapState, localSim: number,
-  players: PlayerInfo[], localCar: Car, myLane: number, selfId?: string
+  players: PlayerInfo[], localCar: Car, myLane: number,
+  track: Track, selfId?: string
 ): HudData | null {
+  // Look ~1 second of top-speed travel ahead so the player has time to brake.
+  const lookaheadDist = 380;
+  const safeFromProgress = (p: number) => {
+    const k = lookaheadMaxCurvature(track, p, lookaheadDist);
+    return Math.round(maxSafeSpeedFor(k));
+  };
   if (!isMp) {
     return {
       lap: Math.min(localLap.currentLap, localLap.totalLaps),
@@ -514,6 +548,7 @@ function pickHudData(
       bestLap: localLap.bestLap,
       total: localSim - localLap.raceStart,
       speed: Math.max(0, Math.round(localCar.speed)),
+      maxSafe: safeFromProgress(localCar.progress),
       lane: Math.round(localCar.laneCurrent),
       warning: localCar.warning,
       desloted: localCar.desloted,
@@ -532,6 +567,7 @@ function pickHudData(
       bestLap: me.bestLap,
       total: host.simTime - me.raceStart,
       speed: Math.max(0, Math.round(car?.speed ?? 0)),
+      maxSafe: car ? safeFromProgress(car.progress) : 0,
       lane: car ? Math.round(car.laneCurrent) : myLane,
       warning: !!car?.warning,
       desloted: !!car?.desloted,
@@ -544,12 +580,13 @@ function pickHudData(
     if (!me) return null;
     return {
       lap: me.lap,
-      totalLaps: 3,
+      totalLaps: TOTAL_LAPS,
       curLap: 0,
       lastLap: null,
       bestLap: me.bestMs ? me.bestMs / 1000 : null,
       total: client.simTime,
       speed: Math.max(0, Math.round(c?.speed ?? 0)),
+      maxSafe: c ? safeFromProgress(c.progress) : 0,
       lane: myLane,
       warning: !!c?.warning,
       desloted: !!c?.desloted,

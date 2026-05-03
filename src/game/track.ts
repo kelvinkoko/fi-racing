@@ -229,4 +229,37 @@ function laneSpacing(): number {
   return LANE_OFFSETS[1] - LANE_OFFSETS[0];
 }
 
+// Largest absolute curvature found in the next `distance` pixels of arc
+// length ahead of `progress`. Used by the HUD to show the upcoming speed
+// limit before the player gets to the corner.
+export function lookaheadMaxCurvature(track: Track, progress: number, distance: number, samples = 10): number {
+  const startArc = (((progress % 1) + 1) % 1) * track.totalLength;
+  let maxK = 0;
+  const step = distance / Math.max(1, samples - 1);
+  for (let i = 0; i < samples; i++) {
+    const arc = (startArc + step * i) % track.totalLength;
+    const { i0, i1, t } = indexAtArcExternal(track, arc);
+    const k = Math.abs(track.curvature[i0] + (track.curvature[i1] - track.curvature[i0]) * t);
+    if (k > maxK) maxK = k;
+  }
+  return maxK;
+}
+
+function indexAtArcExternal(track: Track, arcLen: number): { i0: number; i1: number; t: number } {
+  const lengths = track.cumulativeLength;
+  const n = lengths.length;
+  let lo = 0, hi = n - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >>> 1;
+    if (lengths[mid] <= arcLen) lo = mid;
+    else hi = mid - 1;
+  }
+  const i0 = lo;
+  const i1 = (i0 + 1) % n;
+  const endArc = i1 === 0 ? track.totalLength : lengths[i1];
+  const segLen = endArc - lengths[i0];
+  const t = segLen > 0 ? Math.max(0, Math.min(1, (arcLen - lengths[i0]) / segLen)) : 0;
+  return { i0, i1, t };
+}
+
 export { norm };
