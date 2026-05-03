@@ -145,15 +145,18 @@ function drawCurbSegment(
   sign: number,
   segId: number
 ) {
-  // sign > 0: turn is to the left (in screen coords y-down) — apex on inner side
-  // We pick the corresponding edge polygon side.
+  const samples = track.center.length;
+  // `to` is the exclusive end coming from drawCurbs; iterate [from, to).
+  if (to <= from) return;
+  if (to > samples) to = samples;
+
   const edge: Vec2[] = [];
   const outerEdge: Vec2[] = [];
   const curbWidth = 14;
-  for (let k = from; k <= to; k++) {
+  for (let k = from; k < to; k++) {
     const t = track.tangents[k];
     const n = perp(t);
-    const apexSide = sign > 0 ? 1 : -1; // pick the side of the apex
+    const apexSide = sign > 0 ? 1 : -1;
     const base = {
       x: track.center[k].x + n.x * track.width * apexSide,
       y: track.center[k].y + n.y * track.width * apexSide
@@ -165,6 +168,7 @@ function drawCurbSegment(
     edge.push(base);
     outerEdge.push(out);
   }
+  if (edge.length < 2) return;
   // Draw alternating red/white tiles along the curb strip.
   const tiles = Math.max(4, Math.floor((to - from) / 1.2));
   for (let k = 0; k < tiles; k++) {
