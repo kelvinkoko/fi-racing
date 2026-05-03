@@ -15,7 +15,7 @@ import {
   hostFixedStep, HostState, lerpClientView, makeClientView, makeStartMsg
 } from "../net/raceLoop";
 
-const TOTAL_LAPS = 10;
+const TOTAL_LAPS = 5;
 const REFERENCE_SPEED = 280; // px/s used to convert track-distance gaps into seconds
 const SNAPSHOT_HZ = 20;
 const INPUT_HZ = 30;
