@@ -6,6 +6,12 @@ import { Car, emptyInput, stepCar } from "../game/car";
 import { Keyboard } from "../input/keyboard";
 import { SIM_DT } from "../game/constants";
 import { LapState, formatTime, newLapState, tickLap } from "../game/race";
+import { NetRoom } from "../net/room";
+
+type Props = {
+  net?: NetRoom;
+  onExit?: () => void;
+};
 
 const TOTAL_LAPS = 3;
 
@@ -20,7 +26,7 @@ type HudData = {
   finished: boolean;
 };
 
-export default function Race() {
+export default function Race(_props: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [hud, setHud] = useState<HudData>({
     lap: 1, totalLaps: TOTAL_LAPS, curLap: 0, lastLap: null, bestLap: null, total: 0, speed: 0, finished: false
@@ -138,6 +144,14 @@ export default function Race() {
         <div className="speed-unit">PX/S</div>
       </div>
       {toast && <div className="toast" key={toast.key}>{toast.text}</div>}
+      {_props.onExit && (
+        <button
+          style={{ position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)" }}
+          onClick={_props.onExit}
+        >
+          Exit
+        </button>
+      )}
     </div>
   );
 }
