@@ -43,22 +43,29 @@ export default function Race({ net, onExit }: Props) {
 
   useEffect(() => {
     let cleanup: (() => void) | null = null;
+    let lastStep = "init";
+    const step = <T,>(name: string, fn: () => T): T => {
+      lastStep = name;
+      return fn();
+    };
     try {
-      cleanup = setup();
+      cleanup = setup(step);
     } catch (e) {
-      console.error("Race setup crashed", e);
-      setError(`Race setup error: ${(e as Error).message}`);
+      const err = e as Error;
+      console.error(`Race setup crashed at step "${lastStep}"`, err);
+      setError(`Setup failed at "${lastStep}": ${err.message}\n${(err.stack ?? "").split("\n").slice(0, 3).join("\n")}`);
     }
     return () => { cleanup?.(); };
 
-    function setup(): () => void {
-    const canvas = canvasRef.current!;
+    function setup(step: <T>(name: string, fn: () => T) => T): () => void {
+    const canvas = step("get-canvas", () => canvasRef.current!);
     if (!canvas) throw new Error("canvas ref missing");
-    const ctx = canvas.getContext("2d", { alpha: false })!;
+    const ctx = step("get-ctx", () => canvas.getContext("2d", { alpha: false })!);
+    if (!ctx) throw new Error("2d context unavailable");
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    const track = buildTrack(60);
-    const art = renderTrackArt(track, 1);
+    const track = step("buildTrack", () => buildTrack(60));
+    const art = step("renderTrackArt", () => renderTrackArt(track, 1));
     const cam = createCamera();
     const kb = new Keyboard();
     kb.attach();
@@ -101,7 +108,7 @@ export default function Race({ net, onExit }: Props) {
 
     // Local-only fallback uses the original single-player path.
     const localCar: Car = (() => {
-      const grid = gridPositions(track, players.length);
+      const grid = step("gridPositions", () => gridPositions(track, players.length));
       const me = players.find((p) => p.id === (net?.selfId ?? "local")) ?? players[0];
       const idx = players.indexOf(me);
       return {
@@ -149,10 +156,10 @@ export default function Race({ net, onExit }: Props) {
       hostId = net!.snapshotLobby().hostId;
 
       if (isHost) {
-        hostState = createHostState(players, track, TOTAL_LAPS);
-        const startMsg: StartMsg = makeStartMsg(players, TOTAL_LAPS);
-        net!.recordOwnStart(startMsg);
-        net!.broadcastStart(startMsg);
+        hostState = step("createHostState", () => createHostState(players, track, TOTAL_LAPS));
+        const startMsg: StartMsg = step("makeStartMsg", () => makeStartMsg(players, TOTAL_LAPS));
+        step("recordOwnStart", () => net!.recordOwnStart(startMsg));
+        step("broadcastStart", () => net!.broadcastStart(startMsg));
         const delay = startMsg.startAt - Date.now();
         announceCountdown(performance.now() + Math.max(0, delay));
       } else {
@@ -360,7 +367,10 @@ export default function Race({ net, onExit }: Props) {
       <div className="results">
         <div className="card">
           <h1>Race ended</h1>
-          <div className="sub">{error}</div>
+          <pre style={{
+            color: "var(--muted)", whiteSpace: "pre-wrap", wordBreak: "break-word",
+            fontSize: 12, margin: "8px 0 16px", maxHeight: 240, overflow: "auto"
+          }}>{error}</pre>
           <div className="row" style={{ marginTop: 16 }}>
             <button className="primary" onClick={onExit}>Back to lobby</button>
           </div>
