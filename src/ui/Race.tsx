@@ -501,6 +501,14 @@ export default function Race({ net, onExit }: Props) {
           <div ref={gasRef} className="touch-pad gas">HOLD<br/>GAS</div>
         </div>
       )}
+      {!touch && (
+        <div className="keys-hint">
+          <span><kbd>W</kbd>/<kbd>↑</kbd> throttle</span>
+          <span><kbd>S</kbd>/<kbd>↓</kbd> brake</span>
+          <span><kbd>A</kbd>/<kbd>←</kbd> lane left</span>
+          <span><kbd>D</kbd>/<kbd>→</kbd> lane right</span>
+        </div>
+      )}
       {onExit && (
         <button
           style={{ position: "absolute", bottom: 16, left: 16 }}

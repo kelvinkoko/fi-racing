@@ -269,6 +269,45 @@ input[type="text"]:focus { border-color: var(--accent-2); }
 }
 .warn-text.dead { color: #ff445f; }
 
+.keys-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 18px;
+  pointer-events: none;
+  font-size: 12px;
+  color: rgba(232, 236, 243, 0.55);
+  letter-spacing: 0.5px;
+  background: rgba(11, 13, 18, 0.4);
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.07);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  white-space: nowrap;
+  animation: hint-fade 14s ease forwards;
+}
+.keys-hint span { display: inline-flex; gap: 4px; align-items: center; }
+.keys-hint kbd {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--text);
+  min-width: 14px;
+  text-align: center;
+}
+@keyframes hint-fade {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.keys-hint:hover { opacity: 1 !important; animation: none; }
+
 .toast {
   position: absolute;
   top: 30%;
