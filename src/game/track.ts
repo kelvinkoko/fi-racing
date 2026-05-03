@@ -48,8 +48,8 @@ const CONTROL_POINTS: Vec2[] = [
   { x: -400, y: -440 },  // 16 sweeping double-apex
   { x: -580, y: -260 },  // 17
   { x: -680, y: -80  },  // 18
-  { x: -680, y: 100  },  // 19 outer apex of last left
-  { x: -680, y: 0    },  // 20 entry to start straight (after 90°)
+  { x: -660, y: 70   },  // 19 outside of bottom-left 90° corner
+  { x: -440, y: 0    },  // 20 exit onto start straight
   { x: -300, y: 0    },  // 21 along start straight, before start line
 ];
 
