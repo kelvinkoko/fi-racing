@@ -11,7 +11,7 @@ export const SLOT = {
   // (snappier than a real F1 to keep the arcade feel) but won't reach
   // hairpin speeds without braking.
   accel: 220,
-  brake: 720,            // F1-grade carbon brakes (~5-6g deceleration)
+  brake: 420,            // gentler so braking actually takes time and skill
   drag: 0.40,
   rollingFriction: 35,
   topSpeed: 470,         // ≈ 338 km/h (PX_PER_METER = 5)
