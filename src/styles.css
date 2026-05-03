@@ -91,6 +91,10 @@ input[type="text"]:focus { border-color: var(--accent-2); }
   position: fixed;
   inset: 0;
   background: #0b0d12;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .race canvas {
   width: 100%;
@@ -150,33 +154,35 @@ input[type="text"]:focus { border-color: var(--accent-2); }
   line-height: 1.1;
 }
 .touch-pad.gas {
-  right: 24px;
-  bottom: 24px;
-  width: 160px;
-  height: 160px;
+  right: 16px;
+  bottom: 16px;
+  width: 116px;
+  height: 116px;
   border-radius: 50%;
   background: rgba(54, 211, 153, 0.38);
   border-color: rgba(54, 211, 153, 0.6);
-  font-size: 16px;
+  font-size: 14px;
 }
 .touch-pad.brake {
-  right: 200px;
-  bottom: 44px;
-  width: 96px;
-  height: 96px;
+  right: 30px;
+  bottom: 142px;
+  width: 84px;
+  height: 84px;
   border-radius: 50%;
   background: rgba(255, 46, 77, 0.32);
   border-color: rgba(255, 46, 77, 0.55);
+  font-size: 13px;
 }
 .touch-pad.lane-left, .touch-pad.lane-right {
-  bottom: 24px;
-  width: 110px;
-  height: 96px;
+  bottom: 16px;
+  width: 84px;
+  height: 80px;
   background: rgba(43, 212, 255, 0.22);
   border-color: rgba(43, 212, 255, 0.45);
+  font-size: 12px;
 }
-.touch-pad.lane-left  { left: 24px; }
-.touch-pad.lane-right { left: 152px; }
+.touch-pad.lane-left  { left: 16px; }
+.touch-pad.lane-right { left: 108px; }
 
 .ranking {
   position: absolute;
