@@ -127,6 +127,43 @@ input[type="text"]:focus { border-color: var(--accent-2); }
 .hud-right .speed-big { font-size: 42px; font-weight: 800; letter-spacing: 1px; }
 .hud-right .speed-unit { font-size: 12px; color: var(--muted); margin-top: -8px; }
 
+.touch-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.touch-pad {
+  position: absolute;
+  bottom: 24px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: rgba(20, 24, 34, 0.45);
+  border: 1px solid rgba(255,255,255,0.15);
+  pointer-events: auto;
+  touch-action: none;
+  display: grid;
+  place-items: center;
+  color: rgba(255,255,255,0.8);
+  font-weight: 700;
+  font-size: 14px;
+  user-select: none;
+}
+.touch-pad.left { left: 24px; }
+.touch-pad.gas {
+  right: 24px;
+  background: rgba(54, 211, 153, 0.35);
+  border-color: rgba(54, 211, 153, 0.55);
+}
+.touch-pad.brake {
+  right: 184px;
+  width: 100px;
+  height: 100px;
+  bottom: 44px;
+  background: rgba(255, 46, 77, 0.3);
+  border-color: rgba(255, 46, 77, 0.55);
+}
+
 .toast {
   position: absolute;
   top: 30%;
