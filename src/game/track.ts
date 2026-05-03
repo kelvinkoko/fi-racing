@@ -1,10 +1,14 @@
 import { perp, sampleClosedCatmullRom, Vec2, sub, len, dot, norm } from "./spline";
 
+export const LANE_OFFSETS = [-28, 0, 28] as const;
+export const NUM_LANES = LANE_OFFSETS.length;
+
 export type Track = {
   name: string;
   width: number; // half-width of asphalt
   center: Vec2[]; // sampled centerline (closed)
   tangents: Vec2[]; // unit tangents per sample
+  curvature: number[]; // signed curvature per sample (rad / px)
   inner: Vec2[]; // inner edge polygon
   outer: Vec2[]; // outer edge polygon
   cumulativeLength: number[]; // arc length at each sample
@@ -59,6 +63,22 @@ export function buildTrack(width = 60): Track {
   }
   const totalLength = cumulativeLength[cumulativeLength.length - 1] + len(sub(center[0], center[center.length - 1]));
 
+  // Per-sample signed curvature (rad / px). Compute from tangent rotation
+  // between neighbours divided by arc length between them.
+  const n = center.length;
+  const curvature: number[] = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    const a = tangents[(i - 1 + n) % n];
+    const b = tangents[(i + 1) % n];
+    const cross = a.x * b.y - a.y * b.x;
+    const dotV = a.x * b.x + a.y * b.y;
+    const dAngle = Math.atan2(cross, dotV); // signed turn over 2 samples
+    const i0 = (i - 1 + n) % n;
+    const i1 = (i + 1) % n;
+    const ds = len(sub(center[i1], center[i0])) || 1;
+    curvature[i] = dAngle / ds;
+  }
+
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const p of outer.concat(inner)) {
     if (p.x < minX) minX = p.x;
@@ -72,6 +92,7 @@ export function buildTrack(width = 60): Track {
     width,
     center,
     tangents,
+    curvature,
     inner,
     outer,
     cumulativeLength,
@@ -118,24 +139,76 @@ export function progressAt(track: Track, p: Vec2): number {
   return ((arc % 1) + 1) % 1;
 }
 
-// Grid positions: staggered behind start line on the alternate sides.
-export function gridPositions(track: Track, count: number): { pos: Vec2; angle: number }[] {
-  const out: { pos: Vec2; angle: number }[] = [];
-  const dir = track.startDir;
-  const right = perp(dir);
-  const angle = Math.atan2(dir.y, dir.x);
+// Grid positions: staggered behind start line on alternating lanes.
+export function gridPositions(track: Track, count: number): { pos: Vec2; angle: number; lane: number; progress: number }[] {
+  const out: { pos: Vec2; angle: number; lane: number; progress: number }[] = [];
   for (let i = 0; i < count; i++) {
-    const back = -60 - i * 50;
-    const lateral = (i % 2 === 0 ? -1 : 1) * (track.width * 0.45);
-    out.push({
-      pos: {
-        x: track.startPos.x + dir.x * back + right.x * lateral,
-        y: track.startPos.y + dir.y * back + right.y * lateral,
-      },
-      angle
-    });
+    const lane = i % NUM_LANES;
+    const back = 60 + i * 45; // arc length behind start, in px
+    const progress = ((1 - back / track.totalLength) % 1 + 1) % 1;
+    const sample = sampleAtProgress(track, progress, lane);
+    out.push({ pos: sample.pos, angle: sample.angle, lane, progress });
   }
   return out;
+}
+
+// Sample world-space position + tangent angle at fractional track progress
+// [0,1) and a (possibly fractional) lane index.
+export function sampleAtProgress(track: Track, progress: number, lane: number): { pos: Vec2; angle: number; curvature: number } {
+  const n = track.center.length;
+  const p = ((progress % 1) + 1) % 1;
+  const f = p * n;
+  const i0 = Math.floor(f) % n;
+  const i1 = (i0 + 1) % n;
+  const t = f - Math.floor(f);
+
+  const c0 = track.center[i0];
+  const c1 = track.center[i1];
+  const tg0 = track.tangents[i0];
+  const tg1 = track.tangents[i1];
+
+  // Centerline at progress.
+  const cx = c0.x + (c1.x - c0.x) * t;
+  const cy = c0.y + (c1.y - c0.y) * t;
+  const tx = tg0.x + (tg1.x - tg0.x) * t;
+  const ty = tg0.y + (tg1.y - tg0.y) * t;
+  const tl = Math.hypot(tx, ty) || 1;
+  const tnx = tx / tl;
+  const tny = ty / tl;
+
+  // Lane offset (perpendicular to tangent).
+  const offset = laneOffsetValue(lane);
+  // perp of (tnx, tny) is (-tny, tnx).
+  const px = cx + (-tny) * offset;
+  const py = cy + (tnx) * offset;
+
+  const angle = Math.atan2(tny, tnx);
+  const k0 = track.curvature[i0];
+  const k1 = track.curvature[i1];
+  const curvature = k0 + (k1 - k0) * t;
+
+  return { pos: { x: px, y: py }, angle, curvature };
+}
+
+// Convert a fractional lane index to a perpendicular offset (px). Lane indices
+// outside [0, NUM_LANES-1] extrapolate by the same lane spacing.
+export function laneOffsetValue(lane: number): number {
+  const i0 = Math.floor(lane);
+  const i1 = i0 + 1;
+  const t = lane - i0;
+  const a = sampleLane(i0);
+  const b = sampleLane(i1);
+  return a + (b - a) * t;
+}
+
+function sampleLane(i: number): number {
+  if (i < 0) return LANE_OFFSETS[0] + i * laneSpacing();
+  if (i >= NUM_LANES) return LANE_OFFSETS[NUM_LANES - 1] + (i - (NUM_LANES - 1)) * laneSpacing();
+  return LANE_OFFSETS[i];
+}
+
+function laneSpacing(): number {
+  return LANE_OFFSETS[1] - LANE_OFFSETS[0];
 }
 
 export { norm };

@@ -1,5 +1,5 @@
 import { Car } from "./car";
-import { Track, progressAt } from "./track";
+import { Track } from "./track";
 
 export type LapState = {
   currentLap: number; // 1..totalLaps; becomes totalLaps+1 when finished
@@ -28,9 +28,9 @@ export function newLapState(totalLaps: number, now: number): LapState {
 }
 
 // Returns true if a lap was just completed.
-export function tickLap(state: LapState, car: Car, track: Track, now: number): boolean {
+export function tickLap(state: LapState, car: Car, _track: Track, now: number): boolean {
   if (state.finished) return false;
-  const p = progressAt(track, car.pos);
+  const p = car.progress;
   const prev = state.prevProgress;
   state.prevProgress = p;
 

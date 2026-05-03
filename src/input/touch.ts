@@ -1,87 +1,46 @@
 import { CarInput } from "../game/car";
+import { NUM_LANES } from "../game/track";
 
-// On-screen touch controls: left thumb = steer pad, right thumb = throttle/brake.
-// We track active pointers by id so multi-touch works.
+// Touch model: right side is a giant throttle pad (hold to go), top-right
+// pinky button is brake. Left side has two arrow buttons to step lanes.
 export class TouchControls {
-  private steer = 0;
   private throttle = 0;
   private brake = 0;
-  private steerPointerId: number | null = null;
-  private steerOriginX = 0;
-  private throttlePointerId: number | null = null;
-  private brakePointerId: number | null = null;
+  private laneStep = 0; // edge-triggered: -1 / 0 / +1
+  private throttlePid: number | null = null;
+  private brakePid: number | null = null;
   private cleanups: Array<() => void> = [];
   enabled = false;
 
-  attach(steerEl: HTMLElement, throttleEl: HTMLElement, brakeEl: HTMLElement) {
+  attach(throttleEl: HTMLElement, brakeEl: HTMLElement, laneLeftEl: HTMLElement, laneRightEl: HTMLElement) {
     this.enabled = true;
 
-    const onSteerDown = (e: PointerEvent) => {
-      this.steerPointerId = e.pointerId;
-      this.steerOriginX = e.clientX;
-      steerEl.setPointerCapture(e.pointerId);
-      e.preventDefault();
-    };
-    const onSteerMove = (e: PointerEvent) => {
-      if (e.pointerId !== this.steerPointerId) return;
-      const dx = e.clientX - this.steerOriginX;
-      const max = 70;
-      this.steer = Math.max(-1, Math.min(1, dx / max));
-    };
-    const onSteerUp = (e: PointerEvent) => {
-      if (e.pointerId !== this.steerPointerId) return;
-      this.steerPointerId = null;
-      this.steer = 0;
-    };
+    const tDown = (e: PointerEvent) => { this.throttlePid = e.pointerId; this.throttle = 1; throttleEl.setPointerCapture(e.pointerId); e.preventDefault(); };
+    const tUp = (e: PointerEvent) => { if (e.pointerId === this.throttlePid) { this.throttlePid = null; this.throttle = 0; } };
+    throttleEl.addEventListener("pointerdown", tDown);
+    throttleEl.addEventListener("pointerup", tUp);
+    throttleEl.addEventListener("pointercancel", tUp);
 
-    const onThrottleDown = (e: PointerEvent) => {
-      this.throttlePointerId = e.pointerId;
-      this.throttle = 1;
-      throttleEl.setPointerCapture(e.pointerId);
-      e.preventDefault();
-    };
-    const onThrottleUp = (e: PointerEvent) => {
-      if (e.pointerId !== this.throttlePointerId) return;
-      this.throttlePointerId = null;
-      this.throttle = 0;
-    };
+    const bDown = (e: PointerEvent) => { this.brakePid = e.pointerId; this.brake = 1; brakeEl.setPointerCapture(e.pointerId); e.preventDefault(); };
+    const bUp = (e: PointerEvent) => { if (e.pointerId === this.brakePid) { this.brakePid = null; this.brake = 0; } };
+    brakeEl.addEventListener("pointerdown", bDown);
+    brakeEl.addEventListener("pointerup", bUp);
+    brakeEl.addEventListener("pointercancel", bUp);
 
-    const onBrakeDown = (e: PointerEvent) => {
-      this.brakePointerId = e.pointerId;
-      this.brake = 1;
-      brakeEl.setPointerCapture(e.pointerId);
-      e.preventDefault();
-    };
-    const onBrakeUp = (e: PointerEvent) => {
-      if (e.pointerId !== this.brakePointerId) return;
-      this.brakePointerId = null;
-      this.brake = 0;
-    };
-
-    steerEl.addEventListener("pointerdown", onSteerDown);
-    steerEl.addEventListener("pointermove", onSteerMove);
-    steerEl.addEventListener("pointerup", onSteerUp);
-    steerEl.addEventListener("pointercancel", onSteerUp);
-
-    throttleEl.addEventListener("pointerdown", onThrottleDown);
-    throttleEl.addEventListener("pointerup", onThrottleUp);
-    throttleEl.addEventListener("pointercancel", onThrottleUp);
-
-    brakeEl.addEventListener("pointerdown", onBrakeDown);
-    brakeEl.addEventListener("pointerup", onBrakeUp);
-    brakeEl.addEventListener("pointercancel", onBrakeUp);
+    const lDown = (e: PointerEvent) => { this.laneStep = -1; e.preventDefault(); };
+    const rDown = (e: PointerEvent) => { this.laneStep = 1; e.preventDefault(); };
+    laneLeftEl.addEventListener("pointerdown", lDown);
+    laneRightEl.addEventListener("pointerdown", rDown);
 
     this.cleanups.push(() => {
-      steerEl.removeEventListener("pointerdown", onSteerDown);
-      steerEl.removeEventListener("pointermove", onSteerMove);
-      steerEl.removeEventListener("pointerup", onSteerUp);
-      steerEl.removeEventListener("pointercancel", onSteerUp);
-      throttleEl.removeEventListener("pointerdown", onThrottleDown);
-      throttleEl.removeEventListener("pointerup", onThrottleUp);
-      throttleEl.removeEventListener("pointercancel", onThrottleUp);
-      brakeEl.removeEventListener("pointerdown", onBrakeDown);
-      brakeEl.removeEventListener("pointerup", onBrakeUp);
-      brakeEl.removeEventListener("pointercancel", onBrakeUp);
+      throttleEl.removeEventListener("pointerdown", tDown);
+      throttleEl.removeEventListener("pointerup", tUp);
+      throttleEl.removeEventListener("pointercancel", tUp);
+      brakeEl.removeEventListener("pointerdown", bDown);
+      brakeEl.removeEventListener("pointerup", bUp);
+      brakeEl.removeEventListener("pointercancel", bUp);
+      laneLeftEl.removeEventListener("pointerdown", lDown);
+      laneRightEl.removeEventListener("pointerdown", rDown);
     });
   }
 
@@ -91,8 +50,12 @@ export class TouchControls {
     this.cleanups = [];
   }
 
-  read(): CarInput {
-    return { steer: this.steer, throttle: this.throttle, brake: this.brake };
+  read(prevDesiredLane: number): CarInput {
+    let lane = prevDesiredLane + this.laneStep;
+    this.laneStep = 0;
+    if (lane < 0) lane = 0;
+    if (lane > NUM_LANES - 1) lane = NUM_LANES - 1;
+    return { throttle: this.throttle, brake: this.brake, desiredLane: lane };
   }
 }
 

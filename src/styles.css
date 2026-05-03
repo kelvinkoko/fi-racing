@@ -134,35 +134,76 @@ input[type="text"]:focus { border-color: var(--accent-2); }
 }
 .touch-pad {
   position: absolute;
-  bottom: 24px;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: rgba(20, 24, 34, 0.45);
+  border-radius: 18px;
+  background: rgba(20, 24, 34, 0.5);
   border: 1px solid rgba(255,255,255,0.15);
   pointer-events: auto;
   touch-action: none;
   display: grid;
   place-items: center;
-  color: rgba(255,255,255,0.8);
+  color: rgba(255,255,255,0.85);
   font-weight: 700;
   font-size: 14px;
+  letter-spacing: 1px;
   user-select: none;
+  text-align: center;
+  line-height: 1.1;
 }
-.touch-pad.left { left: 24px; }
 .touch-pad.gas {
   right: 24px;
-  background: rgba(54, 211, 153, 0.35);
-  border-color: rgba(54, 211, 153, 0.55);
+  bottom: 24px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: rgba(54, 211, 153, 0.38);
+  border-color: rgba(54, 211, 153, 0.6);
+  font-size: 16px;
 }
 .touch-pad.brake {
-  right: 184px;
-  width: 100px;
-  height: 100px;
+  right: 200px;
   bottom: 44px;
-  background: rgba(255, 46, 77, 0.3);
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: rgba(255, 46, 77, 0.32);
   border-color: rgba(255, 46, 77, 0.55);
 }
+.touch-pad.lane-left, .touch-pad.lane-right {
+  bottom: 24px;
+  width: 110px;
+  height: 96px;
+  background: rgba(43, 212, 255, 0.22);
+  border-color: rgba(43, 212, 255, 0.45);
+}
+.touch-pad.lane-left  { left: 24px; }
+.touch-pad.lane-right { left: 152px; }
+
+.lane-pips {
+  display: inline-flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.lane-pip {
+  width: 14px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.18);
+}
+.lane-pip.on {
+  background: var(--accent-2);
+  box-shadow: 0 0 8px rgba(43, 212, 255, 0.7);
+}
+
+.speed-big.warn { color: #ffd23f; text-shadow: 0 0 12px rgba(255, 210, 64, 0.7); }
+.speed-big.dead { color: #ff445f; }
+.warn-text {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #ffd23f;
+  margin-top: -2px;
+}
+.warn-text.dead { color: #ff445f; }
 
 .toast {
   position: absolute;

@@ -1,4 +1,4 @@
-import { Track } from "../game/track";
+import { LANE_OFFSETS, Track } from "../game/track";
 import { perp, Vec2 } from "../game/spline";
 
 // Pre-rendered, cached track layers. Drawn once into an offscreen canvas so the
@@ -27,7 +27,7 @@ export function renderTrackArt(track: Track, scale = 1): TrackArt {
   drawRunoff(ctx, track);
   drawAsphalt(ctx, track);
   drawCurbs(ctx, track);
-  drawCenterDashes(ctx, track);
+  drawLaneStripes(ctx, track);
   drawStartLine(ctx, track);
 
   const worldToArt = (x: number, y: number): Vec2 => ({
@@ -185,20 +185,29 @@ function drawCurbSegment(
   }
 }
 
-function drawCenterDashes(ctx: CanvasRenderingContext2D, track: Track) {
-  // Yellow dashed line down the middle, suppressed in tight corners.
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(255, 220, 80, 0.45)";
-  ctx.setLineDash([18, 22]);
-  ctx.beginPath();
-  for (let i = 0; i < track.center.length; i++) {
-    const p = track.center[i];
-    if (i === 0) ctx.moveTo(p.x, p.y);
-    else ctx.lineTo(p.x, p.y);
+function drawLaneStripes(ctx: CanvasRenderingContext2D, track: Track) {
+  // Build polylines along each lane offset and draw them as faint dashed
+  // guides. Boundaries between lanes get a subtle solid line.
+  const samples = track.center.length;
+  ctx.save();
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([10, 14]);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+  for (const off of LANE_OFFSETS) {
+    ctx.beginPath();
+    for (let i = 0; i <= samples; i++) {
+      const idx = i % samples;
+      const t = track.tangents[idx];
+      const n = perp(t);
+      const x = track.center[idx].x + n.x * off;
+      const y = track.center[idx].y + n.y * off;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
   }
-  ctx.closePath();
-  ctx.stroke();
   ctx.setLineDash([]);
+  ctx.restore();
 }
 
 function drawStartLine(ctx: CanvasRenderingContext2D, track: Track) {

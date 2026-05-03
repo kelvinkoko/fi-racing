@@ -1,6 +1,6 @@
-import { Car, CarInput, emptyInput, stepCar } from "../game/car";
+import { Car, CarInput, createSlotCar, emptyInput, stepCar } from "../game/car";
 import { LapState, newLapState, tickLap } from "../game/race";
-import { gridPositions, Track } from "../game/track";
+import { gridPositions, NUM_LANES, Track } from "../game/track";
 import {
   CAR_COLORS, InputMsg, PlayerInfo, SnapshotCar, SnapshotLap, SnapshotMsg, StartMsg
 } from "./protocol";
@@ -29,17 +29,18 @@ export function createHostState(
   const lastInputSeq = new Map<string, number>();
   const laps = new Map<string, LapState>();
   players.forEach((p, i) => {
-    cars.set(p.id, {
+    const seed = grid[i];
+    const car = createSlotCar({
       id: p.id,
       name: p.name,
       color: CAR_COLORS[p.colorIndex],
-      pos: { ...grid[i].pos },
-      vel: { x: 0, y: 0 },
-      angle: grid[i].angle,
-      speed: 0,
-      input: emptyInput()
-    });
-    inputs.set(p.id, emptyInput());
+      progress: seed.progress,
+      lane: seed.lane
+    }, track);
+    cars.set(p.id, car);
+    const init = emptyInput();
+    init.desiredLane = seed.lane;
+    inputs.set(p.id, init);
     lastInputSeq.set(p.id, -1);
     laps.set(p.id, newLapState(totalLaps, 0));
   });
@@ -57,10 +58,11 @@ export function applyHostInput(state: HostState, fromId: string, msg: InputMsg) 
   const lastSeq = state.lastInputSeq.get(fromId) ?? -1;
   if (msg.seq <= lastSeq) return;
   state.lastInputSeq.set(fromId, msg.seq);
+  const desiredLane = Math.max(0, Math.min(NUM_LANES - 1, Math.round(msg.l)));
   state.inputs.set(fromId, {
     throttle: clamp01(msg.t),
     brake: clamp01(msg.b),
-    steer: Math.max(-1, Math.min(1, msg.s))
+    desiredLane
   });
 }
 
@@ -88,7 +90,9 @@ export function buildSnapshot(state: HostState): SnapshotMsg {
       x: round(car.pos.x, 2),
       y: round(car.pos.y, 2),
       a: round(car.angle, 3),
-      v: round(car.speed, 1)
+      v: round(car.speed, 1),
+      d: car.desloted ? 1 : 0,
+      w: car.warning ? 1 : 0
     });
   }
   const laps: SnapshotLap[] = [];
@@ -135,9 +139,18 @@ export function hostFixedStep(
   return { acc, ticks };
 }
 
+export type ClientCarView = {
+  pos: { x: number; y: number };
+  angle: number;
+  speed: number;
+  desloted: boolean;
+  warning: boolean;
+  targetPos?: { x: number; y: number };
+  targetAngle?: number;
+};
+
 export type ClientView = {
-  // Latest snapshot we've integrated into per-car render state.
-  cars: Map<string, { pos: { x: number; y: number }; angle: number; speed: number; targetPos?: { x: number; y: number }; targetAngle?: number }>;
+  cars: Map<string, ClientCarView>;
   laps: Map<string, SnapshotLap>;
   simTime: number;
   tick: number;
@@ -156,11 +169,16 @@ export function applySnapshot(view: ClientView, snap: SnapshotMsg) {
   for (const c of snap.cars) {
     const cur = view.cars.get(c.id);
     if (!cur) {
-      view.cars.set(c.id, { pos: { x: c.x, y: c.y }, angle: c.a, speed: c.v });
+      view.cars.set(c.id, {
+        pos: { x: c.x, y: c.y }, angle: c.a, speed: c.v,
+        desloted: !!c.d, warning: !!c.w
+      });
     } else {
       cur.targetPos = { x: c.x, y: c.y };
       cur.targetAngle = c.a;
       cur.speed = c.v;
+      cur.desloted = !!c.d;
+      cur.warning = !!c.w;
     }
   }
   view.laps.clear();
@@ -168,7 +186,6 @@ export function applySnapshot(view: ClientView, snap: SnapshotMsg) {
 }
 
 export function lerpClientView(view: ClientView, dt: number) {
-  // Simple critically-damped follow. Good enough at 20-30 Hz updates.
   const k = 1 - Math.exp(-dt * 14);
   for (const car of view.cars.values()) {
     if (car.targetPos) {

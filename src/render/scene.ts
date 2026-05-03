@@ -8,6 +8,8 @@ export type CarVisual = {
   color: string;
   name?: string;
   isLocal?: boolean;
+  desloted?: boolean;
+  warning?: boolean;
 };
 
 export type Camera = {
@@ -73,6 +75,16 @@ function drawCar(ctx: CanvasRenderingContext2D, car: CarVisual) {
   ctx.translate(car.pos.x, car.pos.y);
   ctx.rotate(car.angle);
 
+  if (car.warning && !car.desloted) {
+    // Pulse a yellow halo when close to deslot.
+    const pulse = 0.45 + 0.35 * Math.sin(performance.now() / 80);
+    ctx.shadowColor = `rgba(255, 210, 64, ${pulse})`;
+    ctx.shadowBlur = 22;
+  }
+  if (car.desloted) {
+    ctx.globalAlpha = 0.7;
+  }
+
   // Shadow
   ctx.fillStyle = "rgba(0,0,0,0.45)";
   roundRect(ctx, -w / 2 + 2, -h / 2 + 3, w, h, 3);
@@ -97,6 +109,8 @@ function drawCar(ctx: CanvasRenderingContext2D, car: CarVisual) {
 
   // Rear wing
   ctx.fillRect(-w / 2 - 1, -h / 2 - 2, 3, h + 4);
+
+  ctx.shadowBlur = 0;
 
   if (car.isLocal) {
     ctx.strokeStyle = "rgba(255,255,255,0.9)";

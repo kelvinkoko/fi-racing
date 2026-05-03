@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { buildTrack, gridPositions } from "../game/track";
+import { buildTrack, gridPositions, NUM_LANES } from "../game/track";
 import { renderTrackArt } from "../render/trackRender";
 import { createCamera, drawScene, followCamera, CarVisual } from "../render/scene";
-import { Car, emptyInput, stepCar } from "../game/car";
+import { Car, createSlotCar, stepCar } from "../game/car";
 import { Keyboard } from "../input/keyboard";
 import { TouchControls, isTouchDevice } from "../input/touch";
 import { SIM_DT } from "../game/constants";
@@ -22,19 +22,22 @@ type Props = { net?: NetRoom; onExit?: () => void };
 
 type HudData = {
   lap: number; totalLaps: number; curLap: number; lastLap: number | null;
-  bestLap: number | null; total: number; speed: number; finished: boolean;
+  bestLap: number | null; total: number; speed: number; lane: number;
+  warning: boolean; desloted: boolean; finished: boolean;
 };
 
 type StandingsRow = { id: string; name: string; color: string; lap: number; finishMs: number; bestMs: number };
 
 export default function Race({ net, onExit }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const steerRef = useRef<HTMLDivElement | null>(null);
   const gasRef = useRef<HTMLDivElement | null>(null);
   const brakeRef = useRef<HTMLDivElement | null>(null);
+  const laneLeftRef = useRef<HTMLDivElement | null>(null);
+  const laneRightRef = useRef<HTMLDivElement | null>(null);
   const [touch] = useState(() => isTouchDevice());
   const [hud, setHud] = useState<HudData>({
-    lap: 1, totalLaps: TOTAL_LAPS, curLap: 0, lastLap: null, bestLap: null, total: 0, speed: 0, finished: false
+    lap: 1, totalLaps: TOTAL_LAPS, curLap: 0, lastLap: null, bestLap: null, total: 0,
+    speed: 0, lane: 1, warning: false, desloted: false, finished: false
   });
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   const [countdown, setCountdown] = useState<string | null>(null);
@@ -70,18 +73,25 @@ export default function Race({ net, onExit }: Props) {
     const kb = new Keyboard();
     kb.attach();
     const tc = new TouchControls();
-    if (touch && steerRef.current && gasRef.current && brakeRef.current) {
-      tc.attach(steerRef.current, gasRef.current, brakeRef.current);
+    if (touch && gasRef.current && brakeRef.current && laneLeftRef.current && laneRightRef.current) {
+      tc.attach(gasRef.current, brakeRef.current, laneLeftRef.current, laneRightRef.current);
     }
+
+    let myDesiredLane = 1; // middle lane by default
+
     const readInput = () => {
-      const k = kb.read();
-      if (!tc.enabled) return k;
-      const t = tc.read();
-      return {
-        throttle: Math.max(k.throttle, t.throttle),
-        brake: Math.max(k.brake, t.brake),
-        steer: Math.abs(t.steer) > Math.abs(k.steer) ? t.steer : k.steer
-      };
+      const k = kb.read(myDesiredLane);
+      let throttle = k.throttle;
+      let brake = k.brake;
+      let lane = k.desiredLane;
+      if (tc.enabled) {
+        const t = tc.read(lane);
+        throttle = Math.max(throttle, t.throttle);
+        brake = Math.max(brake, t.brake);
+        lane = t.desiredLane;
+      }
+      myDesiredLane = lane;
+      return { throttle, brake, desiredLane: lane };
     };
 
     const ensureSize = () => {
@@ -106,16 +116,17 @@ export default function Race({ net, onExit }: Props) {
       ? net!.snapshotLobby().players
       : [{ id: "local", name: "You", colorIndex: 0, joinedAt: 0 }];
 
-    // Local-only fallback uses the original single-player path.
+    // Local-only fallback (no net): one slot car for the player.
     const localCar: Car = (() => {
       const grid = step("gridPositions", () => gridPositions(track, players.length));
       const me = players.find((p) => p.id === (net?.selfId ?? "local")) ?? players[0];
       const idx = players.indexOf(me);
-      return {
+      const seed = grid[idx];
+      myDesiredLane = seed.lane;
+      return createSlotCar({
         id: me.id, name: me.name, color: CAR_COLORS[me.colorIndex],
-        pos: { ...grid[idx].pos }, vel: { x: 0, y: 0 }, angle: grid[idx].angle,
-        speed: 0, input: emptyInput()
-      };
+        progress: seed.progress, lane: seed.lane
+      }, track);
     })();
     cam.x = localCar.pos.x; cam.y = localCar.pos.y;
 
@@ -150,9 +161,7 @@ export default function Race({ net, onExit }: Props) {
       update();
     }
 
-    // Wire networking.
     if (isMultiplayer) {
-      const order = players.map((p) => p.id);
       hostId = net!.snapshotLobby().hostId;
 
       if (isHost) {
@@ -160,11 +169,12 @@ export default function Race({ net, onExit }: Props) {
         const startMsg: StartMsg = step("makeStartMsg", () => makeStartMsg(players, TOTAL_LAPS));
         step("recordOwnStart", () => net!.recordOwnStart(startMsg));
         step("broadcastStart", () => net!.broadcastStart(startMsg));
+        const me = hostState.cars.get(net!.selfId);
+        if (me) myDesiredLane = me.laneTarget;
         const delay = startMsg.startAt - Date.now();
         announceCountdown(performance.now() + Math.max(0, delay));
       } else {
         clientView = makeClientView();
-        // Use the start message captured by Lobby (it arrived before Race mounted).
         const cached = net!.latestStart;
         if (cached) {
           const delay = cached.startAt - Date.now();
@@ -191,8 +201,6 @@ export default function Race({ net, onExit }: Props) {
           if (id === hostId) setError("Host left — race ended.");
         }
       });
-
-      void order;
     }
 
     const loop = (now: number) => {
@@ -211,7 +219,6 @@ export default function Race({ net, onExit }: Props) {
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
 
-      // ---- Local sim or host sim ----
       if (!isMultiplayer) {
         acc += dt;
         while (acc >= SIM_DT) {
@@ -225,18 +232,15 @@ export default function Race({ net, onExit }: Props) {
           acc -= SIM_DT;
         }
       } else if (isHost && hostState) {
-        // Host applies its own input directly into the host state.
         const myInput = readInput();
         applyHostInput(hostState, net!.selfId, {
-          seq: ++inputSeq, t: myInput.throttle, b: myInput.brake, s: myInput.steer
+          seq: ++inputSeq, t: myInput.throttle, b: myInput.brake, l: myInput.desiredLane
         });
         if (started) {
           const r = hostFixedStep(hostState, track, dt, acc);
           acc = r.acc;
-          // Track lap toasts for the local player.
           const myLap = hostState.laps.get(net!.selfId);
           if (myLap) syncLocalLap(myLap);
-          // Broadcast snapshot.
           if (now - lastSnapSent >= 1000 / SNAPSHOT_HZ) {
             net!.broadcastSnapshot(buildSnapshot(hostState));
             lastSnapSent = now;
@@ -244,11 +248,10 @@ export default function Race({ net, onExit }: Props) {
           if (hostState.raceOver) finishRace();
         }
       } else if (clientView) {
-        // Client sends input to host periodically and interpolates view.
         if (started && now - lastInputSent >= 1000 / INPUT_HZ) {
           const myInput = readInput();
           const msg: InputMsg = {
-            seq: ++inputSeq, t: myInput.throttle, b: myInput.brake, s: myInput.steer
+            seq: ++inputSeq, t: myInput.throttle, b: myInput.brake, l: myInput.desiredLane
           };
           net!.sendInputTo(hostId, msg);
           lastInputSent = now;
@@ -257,7 +260,7 @@ export default function Race({ net, onExit }: Props) {
         if (clientView.finished) finishRace();
       }
 
-      // ---- Camera target ----
+      // Camera target.
       let camTarget = localCar.pos;
       if (isMultiplayer && isHost && hostState) {
         const me = hostState.cars.get(net!.selfId);
@@ -268,13 +271,20 @@ export default function Race({ net, onExit }: Props) {
       }
       followCamera(cam, camTarget, canvas.clientWidth, canvas.clientHeight, dt);
 
-      // ---- Build car visuals ----
+      // Build car visuals.
       const cars: CarVisual[] = [];
       if (!isMultiplayer) {
-        cars.push({ pos: localCar.pos, angle: localCar.angle, color: localCar.color, isLocal: true });
+        cars.push({
+          pos: localCar.pos, angle: localCar.angle, color: localCar.color,
+          isLocal: true, desloted: localCar.desloted, warning: localCar.warning
+        });
       } else if (isHost && hostState) {
         for (const car of hostState.cars.values()) {
-          cars.push({ pos: car.pos, angle: car.angle, color: car.color, isLocal: car.id === net!.selfId });
+          cars.push({
+            pos: car.pos, angle: car.angle, color: car.color,
+            isLocal: car.id === net!.selfId,
+            desloted: car.desloted, warning: car.warning
+          });
         }
       } else if (clientView) {
         for (const [id, c] of clientView.cars) {
@@ -282,18 +292,18 @@ export default function Race({ net, onExit }: Props) {
           cars.push({
             pos: c.pos, angle: c.angle,
             color: info ? CAR_COLORS[info.colorIndex] : "#888",
-            isLocal: id === net!.selfId
+            isLocal: id === net!.selfId,
+            desloted: c.desloted, warning: c.warning
           });
         }
       }
 
       drawScene(ctx, cam, track, art, cars, canvas.clientWidth, canvas.clientHeight);
 
-      // ---- HUD ----
       hudTick += dt;
       if (hudTick > 0.08) {
         hudTick = 0;
-        const data = pickHudData(isMultiplayer, isHost, hostState, clientView, lapState, simTime, players, net?.selfId);
+        const data = pickHudData(isMultiplayer, isHost, hostState, clientView, lapState, simTime, players, localCar, myDesiredLane, net?.selfId);
         if (data) setHud(data);
       }
     };
@@ -413,18 +423,28 @@ export default function Race({ net, onExit }: Props) {
         <div className="timer">{formatTime(hud.curLap)}</div>
         <div className="meta">Last {formatTime(hud.lastLap ?? -1)} · Best {formatTime(hud.bestLap ?? -1)}</div>
         <div className="meta">Total {formatTime(hud.total)}</div>
+        <div className="lane-pips">
+          {Array.from({ length: NUM_LANES }, (_, i) => (
+            <span key={i} className={"lane-pip" + (i === hud.lane ? " on" : "")} />
+          ))}
+        </div>
       </div>
       <div className="hud-right">
-        <div className="speed-big">{hud.speed}</div>
+        <div className={"speed-big" + (hud.warning ? " warn" : "") + (hud.desloted ? " dead" : "")}>
+          {hud.speed}
+        </div>
         <div className="speed-unit">PX/S</div>
+        {hud.warning && !hud.desloted && <div className="warn-text">CORNER!</div>}
+        {hud.desloted && <div className="warn-text dead">DESLOT</div>}
       </div>
       {countdown && <div className="toast" key={countdown + "-cd"}>{countdown}</div>}
       {toast && !countdown && <div className="toast" key={toast.key}>{toast.text}</div>}
       {touch && (
         <div className="touch-controls">
-          <div ref={steerRef} className="touch-pad left">STEER</div>
+          <div ref={laneLeftRef} className="touch-pad lane-left">◀ LANE</div>
+          <div ref={laneRightRef} className="touch-pad lane-right">LANE ▶</div>
           <div ref={brakeRef} className="touch-pad brake">BRK</div>
-          <div ref={gasRef} className="touch-pad gas">GAS</div>
+          <div ref={gasRef} className="touch-pad gas">HOLD<br/>GAS</div>
         </div>
       )}
       {onExit && (
@@ -443,7 +463,7 @@ function pickHudData(
   isMp: boolean, isHost: boolean,
   host: HostState | null, client: ClientView | null,
   localLap: LapState, localSim: number,
-  players: PlayerInfo[], selfId?: string
+  players: PlayerInfo[], localCar: Car, myLane: number, selfId?: string
 ): HudData | null {
   if (!isMp) {
     return {
@@ -453,7 +473,10 @@ function pickHudData(
       lastLap: localLap.lapTimes.length ? localLap.lapTimes[localLap.lapTimes.length - 1] : null,
       bestLap: localLap.bestLap,
       total: localSim - localLap.raceStart,
-      speed: 0,
+      speed: Math.max(0, Math.round(localCar.speed)),
+      lane: Math.round(localCar.laneCurrent),
+      warning: localCar.warning,
+      desloted: localCar.desloted,
       finished: localLap.finished
     };
   }
@@ -469,6 +492,9 @@ function pickHudData(
       bestLap: me.bestLap,
       total: host.simTime - me.raceStart,
       speed: Math.max(0, Math.round(car?.speed ?? 0)),
+      lane: car ? Math.round(car.laneCurrent) : myLane,
+      warning: !!car?.warning,
+      desloted: !!car?.desloted,
       finished: me.finished
     };
   }
@@ -484,6 +510,9 @@ function pickHudData(
       bestLap: me.bestMs ? me.bestMs / 1000 : null,
       total: client.simTime,
       speed: Math.max(0, Math.round(c?.speed ?? 0)),
+      lane: myLane,
+      warning: !!c?.warning,
+      desloted: !!c?.desloted,
       finished: me.finished
     };
   }

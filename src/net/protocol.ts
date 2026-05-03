@@ -30,9 +30,9 @@ export type StartMsg = {
 // Per-player input sent client → host at ~30 Hz.
 export type InputMsg = {
   seq: number;
-  t: number; // ms throttle*1000? we keep raw 0..1
-  b: number;
-  s: number; // -1..1 steer
+  t: number; // throttle 0..1
+  b: number; // brake 0..1
+  l: number; // desired lane index (0..NUM_LANES-1)
 };
 
 // Snapshot from host → all clients at ~20 Hz.
@@ -49,7 +49,9 @@ export type SnapshotCar = {
   x: number;
   y: number;
   a: number; // angle radians
-  v: number; // signed forward speed (for HUD)
+  v: number; // forward speed (for HUD)
+  d: 0 | 1;  // desloted flag
+  w: 0 | 1;  // warning flag
 };
 
 export type SnapshotLap = {

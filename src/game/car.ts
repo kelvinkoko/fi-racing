@@ -1,116 +1,182 @@
-import { CAR, SIM_DT } from "./constants";
-import { Track, onTrack, nearestSample, lateralOffset } from "./track";
-import { perp, sub, dot, len, Vec2 } from "./spline";
+import { SIM_DT } from "./constants";
+import { NUM_LANES, sampleAtProgress, Track } from "./track";
+import { Vec2 } from "./spline";
+
+export const SLOT = {
+  accel: 240,            // px/s^2 at full throttle
+  brake: 360,            // px/s^2 when braking
+  drag: 0.55,            // exponential drag coefficient (per second)
+  rollingFriction: 30,   // gentle deceleration at zero throttle
+  topSpeed: 420,
+  // Centripetal acceleration tolerated before deslot. Smaller = grippier car.
+  maxCentripetal: 9000,  // px / s^2
+  // Visual warning threshold (% of maxCentripetal).
+  warnRatio: 0.85,
+  laneSwitchRate: 1.4,   // lanes / second when switching
+  deslotDuration: 1.6,   // seconds before respawn after deslot
+  respawnSpeed: 80,      // speed (px/s) when respawning
+};
 
 export type CarInput = {
   throttle: number; // 0..1
   brake: number;    // 0..1
-  steer: number;    // -1 (left) .. 1 (right)
+  desiredLane: number; // 0..NUM_LANES-1 (clamped)
 };
 
 export type Car = {
   id: string;
   name: string;
   color: string;
+  // Authoritative state
+  progress: number;       // 0..1 around track
+  speed: number;          // px / s along the lane
+  laneCurrent: number;    // smooth lane (float)
+  laneTarget: number;     // discrete int 0..NUM_LANES-1
+  desloted: boolean;
+  deslotTimer: number;    // remaining seconds in deslot
+  deslotPos: Vec2;
+  deslotVel: Vec2;
+  deslotAngle: number;
+  deslotSpin: number;     // angular velocity rad/s
+  // Cached visual state (recomputed each step from authoritative state)
   pos: Vec2;
-  vel: Vec2; // world-space velocity
-  angle: number; // facing
-  speed: number; // signed forward speed
+  angle: number;
+  curvature: number;      // signed curvature at current progress
+  warning: boolean;       // close to deslot, warn HUD
   input: CarInput;
 };
 
 export function emptyInput(): CarInput {
-  return { throttle: 0, brake: 0, steer: 0 };
+  return { throttle: 0, brake: 0, desiredLane: 1 };
+}
+
+export function createSlotCar(seed: {
+  id: string; name: string; color: string;
+  progress: number; lane: number;
+}, track: Track): Car {
+  const sample = sampleAtProgress(track, seed.progress, seed.lane);
+  return {
+    id: seed.id,
+    name: seed.name,
+    color: seed.color,
+    progress: seed.progress,
+    speed: 0,
+    laneCurrent: seed.lane,
+    laneTarget: seed.lane,
+    desloted: false,
+    deslotTimer: 0,
+    deslotPos: { x: sample.pos.x, y: sample.pos.y },
+    deslotVel: { x: 0, y: 0 },
+    deslotAngle: sample.angle,
+    deslotSpin: 0,
+    pos: { x: sample.pos.x, y: sample.pos.y },
+    angle: sample.angle,
+    curvature: sample.curvature,
+    warning: false,
+    input: emptyInput(),
+  };
 }
 
 export function stepCar(car: Car, track: Track) {
   const dt = SIM_DT;
-  const fwd: Vec2 = { x: Math.cos(car.angle), y: Math.sin(car.angle) };
-  const right = perp(fwd);
+  const input = car.input;
 
-  // Forward signed speed = velocity dot forward.
-  const fwdSpeed = dot(car.vel, fwd);
-  const latSpeed = dot(car.vel, right);
+  if (car.desloted) {
+    // Free-body drift after flying off, then respawn on the lane.
+    car.deslotVel = {
+      x: car.deslotVel.x * Math.exp(-1.4 * dt),
+      y: car.deslotVel.y * Math.exp(-1.4 * dt)
+    };
+    car.deslotPos = {
+      x: car.deslotPos.x + car.deslotVel.x * dt,
+      y: car.deslotPos.y + car.deslotVel.y * dt
+    };
+    car.deslotAngle += car.deslotSpin * dt;
+    car.deslotSpin *= Math.exp(-1.0 * dt);
+    car.pos = car.deslotPos;
+    car.angle = car.deslotAngle;
+    car.warning = false;
 
-  const offTrack = !onTrack(track, car.pos);
-  const dragMul = offTrack ? CAR.offTrackDragMul : 1;
-  const gripMul = offTrack ? CAR.offTrackGripMul : 1;
-  const topMul = offTrack ? CAR.offTrackTopSpeedMul : 1;
+    car.deslotTimer -= dt;
+    if (car.deslotTimer <= 0) {
+      car.desloted = false;
+      car.speed = SLOT.respawnSpeed;
+      car.laneCurrent = car.laneTarget;
+      const sample = sampleAtProgress(track, car.progress, car.laneCurrent);
+      car.pos = { x: sample.pos.x, y: sample.pos.y };
+      car.angle = sample.angle;
+      car.curvature = sample.curvature;
+    }
+    return;
+  }
+
+  // ---- On-rails sim ----
 
   // Throttle / brake.
-  let accel = 0;
-  if (car.input.throttle > 0 && fwdSpeed >= -1) {
-    accel += CAR.accel * car.input.throttle;
-  } else if (car.input.throttle > 0) {
-    // Coming out of reverse — apply brake to slow it.
-    accel += CAR.brake * car.input.throttle;
-  }
-  if (car.input.brake > 0) {
-    if (fwdSpeed > 1) accel -= CAR.brake * car.input.brake;
-    else accel -= CAR.reverseAccel * car.input.brake;
+  let accel = SLOT.accel * input.throttle;
+  if (input.brake > 0) accel -= SLOT.brake * input.brake;
+  // Always-on rolling friction at low throttle.
+  if (input.throttle < 0.05 && input.brake === 0) {
+    accel -= Math.min(SLOT.rollingFriction, car.speed / Math.max(dt, 1e-3));
   }
 
-  // Rolling friction when no input.
-  if (car.input.throttle === 0 && car.input.brake === 0) {
-    if (fwdSpeed > 0) accel -= Math.min(CAR.rollingFriction, fwdSpeed / dt);
-    else if (fwdSpeed < 0) accel += Math.min(CAR.rollingFriction, -fwdSpeed / dt);
+  let v = car.speed + accel * dt;
+  // Drag (proportional to speed).
+  v -= v * SLOT.drag * dt;
+  if (v < 0) v = 0;
+  if (v > SLOT.topSpeed) v = SLOT.topSpeed;
+  car.speed = v;
+
+  // Lane lerp.
+  const desired = clampLane(input.desiredLane);
+  car.laneTarget = desired;
+  const ld = car.laneTarget - car.laneCurrent;
+  if (Math.abs(ld) > 1e-4) {
+    const stepSize = Math.sign(ld) * Math.min(Math.abs(ld), SLOT.laneSwitchRate * dt);
+    car.laneCurrent += stepSize;
   }
 
-  let newFwdSpeed = fwdSpeed + accel * dt;
+  // Advance progress (arc length per second / total length).
+  car.progress = (car.progress + (v * dt) / track.totalLength + 1) % 1;
 
-  // Drag.
-  newFwdSpeed -= newFwdSpeed * CAR.drag * dragMul * dt;
+  // Sample world pose.
+  const sample = sampleAtProgress(track, car.progress, car.laneCurrent);
+  car.pos = { x: sample.pos.x, y: sample.pos.y };
+  car.angle = sample.angle;
+  car.curvature = sample.curvature;
 
-  // Speed cap.
-  const top = CAR.topSpeed * topMul;
-  const revTop = CAR.reverseTopSpeed * topMul;
-  if (newFwdSpeed > top) newFwdSpeed = top;
-  if (newFwdSpeed < -revTop) newFwdSpeed = -revTop;
+  // Centripetal check — too fast for the corner = deslot.
+  const k = Math.abs(sample.curvature);
+  const centripetal = v * v * k;
+  car.warning = centripetal > SLOT.maxCentripetal * SLOT.warnRatio;
+  if (centripetal > SLOT.maxCentripetal) {
+    triggerDeslot(car, sample, k, sample.curvature >= 0 ? -1 : 1);
+  }
+}
 
-  // Steering — turn rate scales down with speed.
-  const speedNorm = Math.min(1, Math.abs(newFwdSpeed) / CAR.topSpeed);
-  const turnScale = 1 - (1 - CAR.turnSpeedFactor) * speedNorm;
-  const dirSign = newFwdSpeed >= 0 ? 1 : -1;
-  car.angle += car.input.steer * CAR.turnRate * turnScale * dirSign * dt;
-
-  // Lateral grip — bleed lateral velocity towards zero.
-  const grip = CAR.lateralGrip * gripMul;
-  const newLat = latSpeed * Math.exp(-grip * dt);
-
-  // Recompose velocity.
-  const newFwd: Vec2 = { x: Math.cos(car.angle), y: Math.sin(car.angle) };
-  const newRight = perp(newFwd);
-  car.vel = {
-    x: newFwd.x * newFwdSpeed + newRight.x * newLat,
-    y: newFwd.y * newFwdSpeed + newRight.y * newLat
+function triggerDeslot(car: Car, sample: { pos: Vec2; angle: number }, _k: number, outwardSign: number) {
+  car.desloted = true;
+  car.deslotTimer = SLOT.deslotDuration;
+  // Forward direction at deslot
+  const fx = Math.cos(sample.angle);
+  const fy = Math.sin(sample.angle);
+  // Outward = perpendicular away from corner apex
+  const ox = -fy * outwardSign;
+  const oy = fx * outwardSign;
+  // Initial velocity = forward speed plus a sideways kick.
+  const v = car.speed;
+  car.deslotVel = {
+    x: fx * v * 0.7 + ox * v * 0.55,
+    y: fy * v * 0.7 + oy * v * 0.55
   };
-  car.speed = newFwdSpeed;
+  car.deslotPos = { x: sample.pos.x, y: sample.pos.y };
+  car.deslotAngle = sample.angle;
+  car.deslotSpin = (Math.random() * 6 + 4) * outwardSign;
+  car.speed = 0;
+}
 
-  // Integrate position.
-  car.pos = { x: car.pos.x + car.vel.x * dt, y: car.pos.y + car.vel.y * dt };
-
-  // Soft wall collision: if too far from centerline, push back and bleed speed.
-  const idx = nearestSample(track, car.pos);
-  const lat = lateralOffset(track, car.pos, idx);
-  const limit = track.width + 60; // runoff allowance before "wall"
-  if (Math.abs(lat) > limit) {
-    const n = perp(track.tangents[idx]);
-    const sign = Math.sign(lat);
-    const overshoot = Math.abs(lat) - limit;
-    car.pos = {
-      x: car.pos.x - n.x * sign * overshoot,
-      y: car.pos.y - n.y * sign * overshoot
-    };
-    // Reflect velocity around the wall normal (which is -sign*n).
-    const wallN: Vec2 = { x: -sign * n.x, y: -sign * n.y };
-    const vn = dot(car.vel, wallN);
-    if (vn < 0) {
-      car.vel = {
-        x: car.vel.x - (1 + CAR.wallBounce) * vn * wallN.x,
-        y: car.vel.y - (1 + CAR.wallBounce) * vn * wallN.y
-      };
-    }
-  }
-
-  void sub; void len;
+export function clampLane(l: number): number {
+  if (l < 0) return 0;
+  if (l > NUM_LANES - 1) return NUM_LANES - 1;
+  return Math.round(l);
 }
