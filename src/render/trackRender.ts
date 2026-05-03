@@ -1,5 +1,7 @@
-import { LANE_OFFSETS, Track } from "../game/track";
+import { gridPositions, LANE_OFFSETS, Track } from "../game/track";
 import { perp, Vec2 } from "../game/spline";
+
+const MAX_GRID_SLOTS = 4;
 
 // Pre-rendered, cached track layers. Drawn once into an offscreen canvas so the
 // per-frame cost is just a single drawImage. Big visual win for performance.
@@ -29,6 +31,7 @@ export function renderTrackArt(track: Track, scale = 1): TrackArt {
   drawCurbs(ctx, track);
   drawLaneStripes(ctx, track);
   drawStartLine(ctx, track);
+  drawStartGrid(ctx, track);
 
   const worldToArt = (x: number, y: number): Vec2 => ({
     x: (x - track.bounds.minX + padding) * scale,
@@ -258,6 +261,43 @@ function drawLaneStripes(ctx: CanvasRenderingContext2D, track: Track) {
   }
   ctx.setLineDash([]);
   ctx.restore();
+}
+
+// Paint white "[ ]" brackets at every grid slot so the grid is visible on
+// the asphalt before the lights go out, like a real F1 starting box.
+function drawStartGrid(ctx: CanvasRenderingContext2D, track: Track) {
+  const slots = gridPositions(track, MAX_GRID_SLOTS);
+  ctx.save();
+  ctx.strokeStyle = "#f0f3f8";
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = "square";
+
+  // Footprint we want to outline (slightly larger than the rendered car).
+  const halfLen = 22;
+  const halfWid = 12;
+  const armLen = 5;
+
+  for (const slot of slots) {
+    ctx.save();
+    ctx.translate(slot.pos.x, slot.pos.y);
+    ctx.rotate(slot.angle);
+    drawBracket(ctx,  halfLen, -halfWid, -armLen,  armLen);  // front-left
+    drawBracket(ctx,  halfLen,  halfWid, -armLen, -armLen);  // front-right
+    drawBracket(ctx, -halfLen, -halfWid,  armLen,  armLen);  // back-left
+    drawBracket(ctx, -halfLen,  halfWid,  armLen, -armLen);  // back-right
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// Draws an L-shaped corner mark anchored at (cx, cy) with arms extending by
+// (dx, 0) and (0, dy) in local space.
+function drawBracket(ctx: CanvasRenderingContext2D, cx: number, cy: number, dx: number, dy: number) {
+  ctx.beginPath();
+  ctx.moveTo(cx + dx, cy);
+  ctx.lineTo(cx, cy);
+  ctx.lineTo(cx, cy + dy);
+  ctx.stroke();
 }
 
 function drawStartLine(ctx: CanvasRenderingContext2D, track: Track) {
