@@ -3,22 +3,25 @@ import { NUM_LANES, sampleAtProgress, Track } from "./track";
 import { Vec2 } from "./spline";
 
 export const SLOT = {
-  accel: 320,            // px/s^2 at full throttle — punchy launch
-  brake: 540,            // px/s^2 when braking — chops speed quickly
+  accel: 320,            // px/s^2 at full throttle
+  brake: 600,            // F1 carbon brakes - ferocious
   drag: 0.55,            // exponential drag coefficient (per second)
-  rollingFriction: 35,   // gentle deceleration at zero throttle
-  topSpeed: 380,
-  // Maximum lateral g the slot tolerates before the car flies off. Smaller
-  // means the car can grip tighter corners; tuned so most corners on this
-  // circuit demand braking from top speed.
-  maxCentripetal: 1500,
-  // Visual warning threshold (% of maxCentripetal). Earlier warning gives
-  // the player time to reach for the brake.
+  rollingFriction: 35,
+  topSpeed: 420,         // ≈ 302 km/h with PX_PER_METER = 5
+  // Maximum lateral g the slot tolerates before flying off. Smaller =
+  // grippier. Tuned so most corners on this circuit demand braking from
+  // top speed.
+  maxCentripetal: 1900,
   warnRatio: 0.7,
-  laneSwitchRate: 1.4,   // lanes / second when switching
-  deslotDuration: 2.4,   // seconds before respawn after deslot — real penalty
-  respawnSpeed: 40,      // speed (px/s) when respawning — must rebuild speed
+  laneSwitchRate: 1.4,
+  deslotDuration: 2.4,
+  respawnSpeed: 50,
 };
+
+// 1 sim pixel ≈ 0.2 metres (5 px per metre). Lets the HUD show speeds in
+// km/h that map roughly onto F1-scale numbers.
+export const PX_PER_METER = 5;
+export const KMH_PER_PX_S = 3.6 / PX_PER_METER; // 0.72
 
 export type CarInput = {
   throttle: number; // 0..1

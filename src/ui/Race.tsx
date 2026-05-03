@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { buildTrack, gridPositions, lookaheadMaxCurvature, NUM_LANES, Track } from "../game/track";
 import { renderTrackArt } from "../render/trackRender";
 import { createCamera, drawScene, followCamera, CarVisual } from "../render/scene";
-import { Car, createSlotCar, maxSafeSpeedFor, renderPose, stepCar } from "../game/car";
+import { Car, createSlotCar, KMH_PER_PX_S, maxSafeSpeedFor, renderPose, stepCar } from "../game/car";
 import { Keyboard } from "../input/keyboard";
 import { TouchControls, isTouchDevice } from "../input/touch";
 import { SIM_DT } from "../game/constants";
@@ -456,11 +456,13 @@ export default function Race({ net, onExit }: Props) {
       </div>
       <div className="hud-right">
         <div className={"speed-big" + speedClass(hud)}>
-          {hud.speed}
+          {Math.round(hud.speed * KMH_PER_PX_S)}
         </div>
-        <div className="speed-unit">PX/S</div>
+        <div className="speed-unit">KM/H</div>
         <div className="speed-max">
-          MAX <span className="speed-max-num">{hud.maxSafe || "—"}</span>
+          MAX <span className="speed-max-num">
+            {hud.maxSafe ? Math.round(hud.maxSafe * KMH_PER_PX_S) : "—"}
+          </span>
         </div>
         <div className="speed-bar">
           <div

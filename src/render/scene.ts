@@ -87,108 +87,101 @@ function drawCar(ctx: CanvasRenderingContext2D, car: CarVisual) {
   ctx.restore();
 }
 
-// Draw an F1-style car oriented along +x (nose pointing right). Total
-// footprint roughly 38 long × 22 wide including wheels.
+// Draw an F1-style car oriented along +x (nose pointing in the direction
+// of travel). Total footprint roughly 44 long × 22 wide including the
+// front wing. Silhouette is deliberately rear-wide / nose-narrow so the
+// orientation reads at a glance from a top-down view.
 function drawF1Body(ctx: CanvasRenderingContext2D, color: string) {
   const lighter = lighten(color, 0.22);
   const darker = darken(color, 0.22);
 
-  // Cast shadow
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  // Wheels first (drawn under body). Rear wheels are larger.
+  drawWheel(ctx, -10, -9, 1.0);
+  drawWheel(ctx,  10, -9, 0.85);
+  drawWheel(ctx, -10,  9, 1.0);
+  drawWheel(ctx,  10,  9, 0.85);
+
+  // Sidepods + chassis silhouette: WIDE at the rear, tapering forward to
+  // a thin nose cone that extends past the front wheels.
   ctx.beginPath();
-  ctx.ellipse(0, 2, 20, 11, 0, 0, Math.PI * 2);
+  ctx.moveTo(-15, -6);   // rear of engine cover (left)
+  ctx.lineTo(-6, -8);    // sidepod widest mid-rear (left)
+  ctx.lineTo(2, -6);     // narrowing toward cockpit
+  ctx.lineTo(8, -3);     // shoulder of nose cone
+  ctx.lineTo(17, -1.4);  // nose tapering
+  ctx.lineTo(20, 0);     // nose tip
+  ctx.lineTo(17, 1.4);
+  ctx.lineTo(8, 3);
+  ctx.lineTo(2, 6);
+  ctx.lineTo(-6, 8);
+  ctx.lineTo(-15, 6);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, -8, 0, 8);
+  grad.addColorStop(0, lighter);
+  grad.addColorStop(0.5, color);
+  grad.addColorStop(1, darker);
+  ctx.fillStyle = grad;
   ctx.fill();
 
-  // Floor/underbody (dark base silhouette so wing/body sit on top)
-  ctx.fillStyle = "#0d0f14";
-  roundRect(ctx, -16, -7, 30, 14, 3);
-  ctx.fill();
-
-  // Rear wheels (drawn before the body so the body overlaps slightly)
-  drawWheel(ctx, -10, -8.5);
-  drawWheel(ctx, -10, 8.5);
-  // Front wheels — slightly smaller, more outboard
-  drawWheel(ctx, 9, -8.5, 0.9);
-  drawWheel(ctx, 9, 8.5, 0.9);
-
-  // Sidepods — wider mid-body, team colour
+  // Engine cover spine (subtle dark stripe down the back half).
   ctx.fillStyle = darker;
   ctx.beginPath();
-  ctx.moveTo(-12, -7);
-  ctx.lineTo(2, -8.5);
-  ctx.lineTo(8, -6);
-  ctx.lineTo(8, 6);
-  ctx.lineTo(2, 8.5);
-  ctx.lineTo(-12, 7);
+  ctx.moveTo(-15, -2.5);
+  ctx.lineTo(-2, -2);
+  ctx.lineTo(0, 0);
+  ctx.lineTo(-2, 2);
+  ctx.lineTo(-15, 2.5);
   ctx.closePath();
   ctx.fill();
 
-  // Main body / engine cover — sleek, narrowing toward nose
-  const bodyGrad = ctx.createLinearGradient(0, -6, 0, 6);
-  bodyGrad.addColorStop(0, lighter);
-  bodyGrad.addColorStop(0.5, color);
-  bodyGrad.addColorStop(1, darker);
-  ctx.fillStyle = bodyGrad;
-  ctx.beginPath();
-  ctx.moveTo(-13, -3);   // tail of engine cover
-  ctx.lineTo(-4, -5);
-  ctx.lineTo(2, -4.5);   // shoulder near cockpit
-  ctx.lineTo(13, -2);    // nose taper
-  ctx.lineTo(15, 0);     // nose tip
-  ctx.lineTo(13, 2);
-  ctx.lineTo(2, 4.5);
-  ctx.lineTo(-4, 5);
-  ctx.lineTo(-13, 3);
-  ctx.closePath();
-  ctx.fill();
-
-  // Cockpit / halo
-  ctx.fillStyle = "rgba(15, 18, 25, 0.95)";
-  ctx.beginPath();
-  ctx.ellipse(1, 0, 4, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(220, 226, 235, 0.5)";
-  ctx.lineWidth = 0.7;
-  ctx.stroke();
-
-  // Driver helmet stripe
-  ctx.fillStyle = lighten(color, 0.4);
-  ctx.fillRect(0, -1, 2, 2);
-
-  // Front wing — wide, with white plane and team-colour endplates
-  ctx.fillStyle = "#e8ecf3";
-  roundRect(ctx, 13, -9, 4, 18, 1.2);
-  ctx.fill();
-  ctx.fillStyle = color;
-  ctx.fillRect(13, -9.5, 4, 1.5);
-  ctx.fillRect(13, 8, 4, 1.5);
-
-  // Rear wing — vertical, with endplates
+  // Cockpit + halo (positioned slightly behind centre, in front of the
+  // sidepods).
   ctx.fillStyle = "#1a1f2b";
-  ctx.fillRect(-17.5, -7.5, 1.6, 15);          // beam
-  ctx.fillStyle = color;
-  ctx.fillRect(-18.5, -8.5, 2, 4);             // top-left endplate
-  ctx.fillRect(-18.5, 4.5, 2, 4);              // top-right endplate
-  ctx.fillStyle = "#e8ecf3";
-  ctx.fillRect(-16.5, -6, 0.8, 12);            // light upper element
+  ctx.beginPath();
+  ctx.ellipse(-1, 0, 3.6, 2.8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(220, 226, 235, 0.55)";
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  // Helmet stripe — clearly forward-of-centre on the cockpit.
+  ctx.fillStyle = lighten(color, 0.45);
+  ctx.fillRect(-1.5, -1, 2, 2);
 
-  // Tiny mirrors
+  // Mirrors just ahead of cockpit shoulders.
   ctx.fillStyle = "#0d0f14";
-  ctx.fillRect(3, -5.5, 1.2, 1);
-  ctx.fillRect(3, 4.5, 1.2, 1);
+  ctx.fillRect(2, -5.5, 1.4, 1);
+  ctx.fillRect(2, 4.5, 1.4, 1);
+
+  // Front wing — wide, sits at the very front past the nose tip.
+  ctx.fillStyle = "#e8ecf3";
+  roundRect(ctx, 18, -10, 4, 20, 1.2);
+  ctx.fill();
+  ctx.fillStyle = color;
+  ctx.fillRect(18, -10.5, 4, 1.5); // top endplate strip
+  ctx.fillRect(18, 9, 4, 1.5);     // bottom endplate strip
+
+  // Rear wing — narrower than the front wing so the silhouette tapers
+  // visibly from rear to nose.
+  ctx.fillStyle = "#1a1f2b";
+  ctx.fillRect(-18.5, -7, 1.4, 14); // upright beam
+  ctx.fillStyle = "#e8ecf3";
+  ctx.fillRect(-17, -6, 0.8, 12);   // light upper element
+  ctx.fillStyle = color;
+  ctx.fillRect(-19.5, -7.5, 1.6, 3); // tiny endplate (top-left)
+  ctx.fillRect(-19.5, 4.5, 1.6, 3);  // tiny endplate (bottom-left)
 }
 
 function drawWheel(ctx: CanvasRenderingContext2D, x: number, y: number, scale = 1) {
-  const w = 7 * scale;
-  const h = 3.4 * scale;
+  const w = 8 * scale;     // along x (rolling direction)
+  const h = 3.6 * scale;   // tyre thickness
   // Tyre
   ctx.fillStyle = "#0c0d11";
-  roundRect(ctx, x - w / 2, y - h / 2, w, h, 1.2);
+  roundRect(ctx, x - w / 2, y - h / 2, w, h, 1.4);
   ctx.fill();
   // Sidewall highlight
   ctx.fillStyle = "rgba(255,255,255,0.08)";
   ctx.fillRect(x - w / 2 + 1, y - h / 2 + 0.4, w - 2, 0.6);
-  // Hub (small lighter dot)
+  // Hub
   ctx.fillStyle = "#3a3f4d";
   ctx.beginPath();
   ctx.ellipse(x, y, 1.2, 0.9, 0, 0, Math.PI * 2);
