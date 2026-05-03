@@ -304,7 +304,7 @@ input[type="text"]:focus { border-color: var(--accent-2); }
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   white-space: nowrap;
-  animation: hint-fade 14s ease forwards;
+  transition: opacity 200ms ease;
 }
 .keys-hint span { display: inline-flex; gap: 4px; align-items: center; }
 .keys-hint kbd {
@@ -319,11 +319,7 @@ input[type="text"]:focus { border-color: var(--accent-2); }
   min-width: 14px;
   text-align: center;
 }
-@keyframes hint-fade {
-  0%, 70% { opacity: 1; }
-  100% { opacity: 0; }
-}
-.keys-hint:hover { opacity: 1 !important; animation: none; }
+.keys-hint:hover { color: var(--text); }
 
 .toast {
   position: absolute;
