@@ -184,7 +184,7 @@ export function sampleAtProgress(track: Track, progress: number, lane: number): 
   const k0 = track.curvature[i0];
   const k1 = track.curvature[i1];
   const kCenter = k0 + (k1 - k0) * t;
-  const curvature = laneAdjustedCurvature(kCenter, offset);
+  const curvature = effectiveCurvature(kCenter, offset);
 
   return { pos: { x: px, y: py }, angle, curvature };
 }
@@ -203,6 +203,24 @@ export function laneAdjustedCurvature(kCenter: number, lateralOffset: number): n
   const denom = 1 - kCenter * lateralOffset;
   if (denom <= 0.05) return kCenter / 0.05; // clamp tightly
   return kCenter / denom;
+}
+
+// Extra grip the outer lane gets on top of its geometric advantage. Pure
+// arcade fudge — real slots/F1 cars can put more load on the outside, and
+// this gives the player a meaningful incentive to take the long way round
+// to overtake.
+const OUTER_GRIP_BONUS = 0.30;
+
+// Combined geometry + outer-lane grip bonus into a single effective
+// curvature. Used by the deslot check and the HUD lookahead so both
+// behave consistently. Outer side: |κ_eff| < |κ_lane|. Inner / centre /
+// straight: no bonus.
+export function effectiveCurvature(kCenter: number, lateralOffset: number): number {
+  const kLane = laneAdjustedCurvature(kCenter, lateralOffset);
+  if (Math.abs(kCenter) < 1e-6) return kLane;
+  // outerness > 0 when the lane is on the outside of the curve.
+  const outerness = -Math.sign(kCenter) * Math.sign(lateralOffset);
+  return outerness > 0 ? kLane / (1 + OUTER_GRIP_BONUS) : kLane;
 }
 
 // Locate the sample segment containing a given arc-length offset from start.
@@ -259,7 +277,7 @@ export function lookaheadMaxCurvature(track: Track, progress: number, distance: 
     const arc = (startArc + step * i) % track.totalLength;
     const { i0, i1, t } = indexAtArcExternal(track, arc);
     const kCenter = track.curvature[i0] + (track.curvature[i1] - track.curvature[i0]) * t;
-    const k = Math.abs(laneAdjustedCurvature(kCenter, offset));
+    const k = Math.abs(effectiveCurvature(kCenter, offset));
     if (k > maxK) maxK = k;
   }
   return maxK;
