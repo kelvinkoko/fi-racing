@@ -2,6 +2,10 @@ import { SIM_DT } from "./constants";
 import { NUM_LANES, sampleAtProgress, Track } from "./track";
 import { Vec2 } from "./spline";
 
+// Physical footprint of a single car along the track (px). Used for
+// collision spacing.
+export const CAR_LENGTH_PX = 44;
+
 export const SLOT = {
   // Acceleration / drag tuned so the car reaches ~90% of top speed in ~4s
   // (snappier than a real F1 to keep the arcade feel) but won't reach
@@ -57,6 +61,9 @@ export type Car = {
   prevAngle: number;
   curvature: number;      // signed curvature at current progress
   warning: boolean;       // close to deslot, warn HUD
+  // Speed cap applied this tick because of a car ahead in the same lane.
+  // Reset every tick by the traffic-resolution pass before stepCar runs.
+  trafficCap: number;
   input: CarInput;
 };
 
@@ -89,6 +96,7 @@ export function createSlotCar(seed: {
     prevAngle: sample.angle,
     curvature: sample.curvature,
     warning: false,
+    trafficCap: SLOT.topSpeed,
     input: emptyInput(),
   };
 }
@@ -143,8 +151,13 @@ export function stepCar(car: Car, track: Track) {
   let v = car.speed + accel * dt;
   // Drag (proportional to speed).
   v -= v * SLOT.drag * dt;
+
+  // Speed cap.
+  const top = SLOT.topSpeed;
+  if (v > top) v = top;
+  // Cap by traffic ahead in the same lane.
+  if (v > car.trafficCap) v = car.trafficCap;
   if (v < 0) v = 0;
-  if (v > SLOT.topSpeed) v = SLOT.topSpeed;
   car.speed = v;
 
   // Lane lerp.

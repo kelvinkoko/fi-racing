@@ -1,6 +1,6 @@
-import { Car, CarInput, createSlotCar, emptyInput, stepCar } from "../game/car";
+import { Car, CAR_LENGTH_PX, CarInput, createSlotCar, emptyInput, SLOT, stepCar } from "../game/car";
 import { LapState, newLapState, tickLap } from "../game/race";
-import { gridPositions, NUM_LANES, Track } from "../game/track";
+import { gridPositions, NUM_LANES, sampleAtProgress, Track } from "../game/track";
 import {
   CAR_COLORS, InputMsg, PlayerInfo, SnapshotCar, SnapshotLap, SnapshotMsg, StartMsg
 } from "./protocol";
@@ -69,6 +69,13 @@ export function applyHostInput(state: HostState, fromId: string, msg: InputMsg) 
 export function stepHost(state: HostState, track: Track) {
   state.simTime += SIM_DT;
   state.tick += 1;
+
+  // Resolve same-lane traffic before stepping any car. Each car gets a
+  // trafficCap = the speed of the nearest car ahead in the same lane (or
+  // top speed if no traffic). stepCar then clamps to that cap so the car
+  // behind can't accelerate through the one in front.
+  applyTraffic(state, track);
+
   let allFinished = true;
   for (const [id, car] of state.cars) {
     const lap = state.laps.get(id)!;
@@ -79,7 +86,67 @@ export function stepHost(state: HostState, track: Track) {
     }
     if (!lap.finished) allFinished = false;
   }
+
+  // Safety net: if a car overshot the one in front anyway (e.g. the leader
+  // braked harder than our cap could anticipate), push it back to bumper-to-
+  // bumper distance and match speeds.
+  preventOverlap(state, track);
+
   if (allFinished) state.raceOver = true;
+}
+
+// Two cars are "in the same lane" if their smooth lane positions are within
+// half a lane of each other. Easing into a different lane lifts the cap.
+const SAME_LANE_TOL = 0.5;
+// Ignore traffic gaps > 30% of a lap — that's a lapping situation, not a
+// follow.
+const FAR_GAP = 0.3;
+
+function applyTraffic(state: HostState, track: Track) {
+  const carLen = CAR_LENGTH_PX / track.totalLength;
+  const followGap = carLen * 1.5;
+
+  for (const a of state.cars.values()) {
+    a.trafficCap = SLOT.topSpeed;
+    if (a.desloted) continue;
+    let bestGap = Infinity;
+    let leader: Car | null = null;
+    for (const b of state.cars.values()) {
+      if (a === b || b.desloted) continue;
+      if (Math.abs(a.laneCurrent - b.laneCurrent) > SAME_LANE_TOL) continue;
+      let gap = b.progress - a.progress;
+      if (gap < 0) gap += 1;
+      if (gap > FAR_GAP || gap > followGap) continue;
+      if (gap < bestGap) {
+        bestGap = gap;
+        leader = b;
+      }
+    }
+    if (leader) a.trafficCap = leader.speed;
+  }
+}
+
+function preventOverlap(state: HostState, track: Track) {
+  const carLen = CAR_LENGTH_PX / track.totalLength;
+  for (const a of state.cars.values()) {
+    if (a.desloted) continue;
+    for (const b of state.cars.values()) {
+      if (a === b || b.desloted) continue;
+      if (Math.abs(a.laneCurrent - b.laneCurrent) > SAME_LANE_TOL) continue;
+      let gap = b.progress - a.progress;
+      if (gap < 0) gap += 1;
+      if (gap > FAR_GAP) continue; // wrap-around lapping case
+      if (gap < carLen) {
+        // Push a back behind b's bumper.
+        a.progress = ((b.progress - carLen) % 1 + 1) % 1;
+        const sample = sampleAtProgress(track, a.progress, a.laneCurrent);
+        a.pos = { x: sample.pos.x, y: sample.pos.y };
+        a.angle = sample.angle;
+        a.curvature = sample.curvature;
+        if (a.speed > b.speed) a.speed = b.speed;
+      }
+    }
+  }
 }
 
 export function buildSnapshot(state: HostState): SnapshotMsg {
