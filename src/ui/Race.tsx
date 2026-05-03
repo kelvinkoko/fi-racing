@@ -14,7 +14,8 @@ import {
   hostFixedStep, HostState, lerpClientView, makeClientView, makeStartMsg
 } from "../net/raceLoop";
 
-const TOTAL_LAPS = 3;
+const TOTAL_LAPS = 10;
+const REFERENCE_SPEED = 280; // px/s used to convert track-distance gaps into seconds
 const SNAPSHOT_HZ = 20;
 const INPUT_HZ = 30;
 
@@ -27,6 +28,20 @@ type HudData = {
 };
 
 type StandingsRow = { id: string; name: string; color: string; lap: number; finishMs: number; bestMs: number };
+
+type RankRow = {
+  id: string;
+  name: string;
+  color: string;
+  lap: number;
+  totalLaps: number;
+  isLocal: boolean;
+  finished: boolean;
+  finishMs: number;
+  // For non-leader rows: gap to leader. Either a seconds string (formatted)
+  // or a "+N L" lap-down string. Leader has gap = "LEADER".
+  gap: string;
+};
 
 export default function Race({ net, onExit }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -41,6 +56,7 @@ export default function Race({ net, onExit }: Props) {
   });
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   const [countdown, setCountdown] = useState<string | null>(null);
+  const [ranking, setRanking] = useState<RankRow[]>([]);
   const [standings, setStandings] = useState<StandingsRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -312,6 +328,8 @@ export default function Race({ net, onExit }: Props) {
         hudTick = 0;
         const data = pickHudData(isMultiplayer, isHost, hostState, clientView, lapState, simTime, players, localCar, myDesiredLane, net?.selfId);
         if (data) setHud(data);
+        const rank = buildRanking(isMultiplayer, isHost, hostState, clientView, lapState, players, localCar, track.totalLength, net?.selfId);
+        setRanking(rank);
       }
     };
 
@@ -444,6 +462,21 @@ export default function Race({ net, onExit }: Props) {
         {hud.warning && !hud.desloted && <div className="warn-text">CORNER!</div>}
         {hud.desloted && <div className="warn-text dead">DESLOT</div>}
       </div>
+      {ranking.length > 0 && (
+        <div className="ranking">
+          {ranking.map((r, i) => (
+            <div key={r.id} className={"rank-row" + (r.isLocal ? " local" : "")}>
+              <span className="rank-pos">P{i + 1}</span>
+              <span className="rank-dot" style={{ background: r.color }} />
+              <span className="rank-name">{r.name}</span>
+              <span className="rank-lap">L{r.lap}/{r.totalLaps}</span>
+              <span className={"rank-gap" + (r.gap === "LEADER" ? " leader" : "")}>
+                {r.gap}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       {countdown && <div className="toast" key={countdown + "-cd"}>{countdown}</div>}
       {toast && !countdown && <div className="toast" key={toast.key}>{toast.text}</div>}
       {touch && (
@@ -525,4 +558,101 @@ function pickHudData(
   }
   void players;
   return null;
+}
+
+type RankBuildEntry = {
+  id: string;
+  name: string;
+  color: string;
+  isLocal: boolean;
+  totalDistance: number; // arc length covered since race start
+  lap: number;           // current lap (1..total)
+  totalLaps: number;
+  finished: boolean;
+  finishMs: number;
+};
+
+function buildRanking(
+  isMp: boolean, isHost: boolean,
+  host: HostState | null, client: ClientView | null,
+  localLap: LapState,
+  players: PlayerInfo[], localCar: Car,
+  trackLength: number, selfId?: string
+): RankRow[] {
+  const entries: RankBuildEntry[] = [];
+
+  if (!isMp) {
+    entries.push({
+      id: localCar.id, name: localCar.name, color: localCar.color, isLocal: true,
+      totalDistance: ((localLap.currentLap - 1) + localCar.progress) * trackLength,
+      lap: Math.min(localLap.currentLap, localLap.totalLaps),
+      totalLaps: localLap.totalLaps,
+      finished: localLap.finished,
+      finishMs: Math.round((localLap.finishTime ?? 0) * 1000)
+    });
+  } else if (isHost && host) {
+    for (const [id, car] of host.cars) {
+      const info = players.find((p) => p.id === id);
+      const lap = host.laps.get(id);
+      const lapNum = lap ? Math.min(lap.currentLap, lap.totalLaps) : 1;
+      const lapsCompleted = lap ? lap.currentLap - 1 : 0;
+      entries.push({
+        id, name: info?.name ?? id.slice(0, 6),
+        color: CAR_COLORS[info?.colorIndex ?? 0],
+        isLocal: id === selfId,
+        totalDistance: (lapsCompleted + car.progress) * trackLength,
+        lap: lapNum,
+        totalLaps: host.totalLaps,
+        finished: !!lap?.finished,
+        finishMs: Math.round((lap?.finishTime ?? 0) * 1000)
+      });
+    }
+  } else if (client) {
+    for (const [id, c] of client.cars) {
+      const info = players.find((p) => p.id === id);
+      const lap = client.laps.get(id);
+      const lapNum = lap?.lap ?? 1;
+      const lapsCompleted = Math.max(0, lapNum - 1);
+      entries.push({
+        id, name: info?.name ?? id.slice(0, 6),
+        color: CAR_COLORS[info?.colorIndex ?? 0],
+        isLocal: id === selfId,
+        totalDistance: (lapsCompleted + (c.progress ?? 0)) * trackLength,
+        lap: lapNum,
+        totalLaps: TOTAL_LAPS,
+        finished: !!lap?.finished,
+        finishMs: lap?.finishMs ?? 0
+      });
+    }
+  }
+
+  // Finished cars sort by finish time ascending; unfinished by distance desc.
+  entries.sort((a, b) => {
+    if (a.finished && b.finished) return a.finishMs - b.finishMs;
+    if (a.finished) return -1;
+    if (b.finished) return 1;
+    return b.totalDistance - a.totalDistance;
+  });
+
+  if (entries.length === 0) return [];
+
+  const leader = entries[0];
+  return entries.map((e, i) => ({
+    id: e.id, name: e.name, color: e.color, lap: e.lap, totalLaps: e.totalLaps,
+    isLocal: e.isLocal, finished: e.finished, finishMs: e.finishMs,
+    gap: i === 0 ? "LEADER" : computeGap(leader, e, trackLength)
+  }));
+}
+
+function computeGap(leader: RankBuildEntry, p: RankBuildEntry, trackLength: number): string {
+  if (leader.finished && p.finished) {
+    const ms = p.finishMs - leader.finishMs;
+    return `+${(ms / 1000).toFixed(3)}`;
+  }
+  const dist = leader.totalDistance - p.totalDistance;
+  const lapsBehind = Math.floor(dist / trackLength);
+  if (lapsBehind >= 1) return `+${lapsBehind} L`;
+  const seconds = dist / REFERENCE_SPEED;
+  if (seconds >= 100) return `+${seconds.toFixed(1)}`;
+  return `+${seconds.toFixed(3)}`;
 }

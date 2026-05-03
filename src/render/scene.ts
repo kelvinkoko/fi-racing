@@ -69,57 +69,138 @@ export function drawScene(
 }
 
 function drawCar(ctx: CanvasRenderingContext2D, car: CarVisual) {
-  const w = 28;
-  const h = 14;
   ctx.save();
   ctx.translate(car.pos.x, car.pos.y);
   ctx.rotate(car.angle);
 
   if (car.warning && !car.desloted) {
-    // Pulse a yellow halo when close to deslot.
     const pulse = 0.45 + 0.35 * Math.sin(performance.now() / 80);
     ctx.shadowColor = `rgba(255, 210, 64, ${pulse})`;
     ctx.shadowBlur = 22;
   }
-  if (car.desloted) {
-    ctx.globalAlpha = 0.7;
-  }
+  if (car.desloted) ctx.globalAlpha = 0.7;
 
-  // Shadow
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
-  roundRect(ctx, -w / 2 + 2, -h / 2 + 3, w, h, 3);
-  ctx.fill();
-
-  // Body
-  const grad = ctx.createLinearGradient(0, -h / 2, 0, h / 2);
-  grad.addColorStop(0, lighten(car.color, 0.25));
-  grad.addColorStop(1, darken(car.color, 0.15));
-  ctx.fillStyle = grad;
-  roundRect(ctx, -w / 2, -h / 2, w, h, 3);
-  ctx.fill();
-
-  // Cockpit
-  ctx.fillStyle = "rgba(20,24,34,0.85)";
-  roundRect(ctx, -3, -h / 2 + 3, 9, h - 6, 2);
-  ctx.fill();
-
-  // Front wing hint
-  ctx.fillStyle = darken(car.color, 0.3);
-  ctx.fillRect(w / 2 - 3, -h / 2 - 1, 3, h + 2);
-
-  // Rear wing
-  ctx.fillRect(-w / 2 - 1, -h / 2 - 2, 3, h + 4);
+  drawF1Body(ctx, car.color);
 
   ctx.shadowBlur = 0;
 
   if (car.isLocal) {
-    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
     ctx.lineWidth = 1.2;
-    roundRect(ctx, -w / 2 - 1.5, -h / 2 - 1.5, w + 3, h + 3, 4);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 22, 12, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
 
   ctx.restore();
+}
+
+// Draw an F1-style car oriented along +x (nose pointing right). Total
+// footprint roughly 38 long × 22 wide including wheels.
+function drawF1Body(ctx: CanvasRenderingContext2D, color: string) {
+  const lighter = lighten(color, 0.22);
+  const darker = darken(color, 0.22);
+
+  // Cast shadow
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 20, 11, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Floor/underbody (dark base silhouette so wing/body sit on top)
+  ctx.fillStyle = "#0d0f14";
+  roundRect(ctx, -16, -7, 30, 14, 3);
+  ctx.fill();
+
+  // Rear wheels (drawn before the body so the body overlaps slightly)
+  drawWheel(ctx, -10, -8.5);
+  drawWheel(ctx, -10, 8.5);
+  // Front wheels — slightly smaller, more outboard
+  drawWheel(ctx, 9, -8.5, 0.9);
+  drawWheel(ctx, 9, 8.5, 0.9);
+
+  // Sidepods — wider mid-body, team colour
+  ctx.fillStyle = darker;
+  ctx.beginPath();
+  ctx.moveTo(-12, -7);
+  ctx.lineTo(2, -8.5);
+  ctx.lineTo(8, -6);
+  ctx.lineTo(8, 6);
+  ctx.lineTo(2, 8.5);
+  ctx.lineTo(-12, 7);
+  ctx.closePath();
+  ctx.fill();
+
+  // Main body / engine cover — sleek, narrowing toward nose
+  const bodyGrad = ctx.createLinearGradient(0, -6, 0, 6);
+  bodyGrad.addColorStop(0, lighter);
+  bodyGrad.addColorStop(0.5, color);
+  bodyGrad.addColorStop(1, darker);
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.moveTo(-13, -3);   // tail of engine cover
+  ctx.lineTo(-4, -5);
+  ctx.lineTo(2, -4.5);   // shoulder near cockpit
+  ctx.lineTo(13, -2);    // nose taper
+  ctx.lineTo(15, 0);     // nose tip
+  ctx.lineTo(13, 2);
+  ctx.lineTo(2, 4.5);
+  ctx.lineTo(-4, 5);
+  ctx.lineTo(-13, 3);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cockpit / halo
+  ctx.fillStyle = "rgba(15, 18, 25, 0.95)";
+  ctx.beginPath();
+  ctx.ellipse(1, 0, 4, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(220, 226, 235, 0.5)";
+  ctx.lineWidth = 0.7;
+  ctx.stroke();
+
+  // Driver helmet stripe
+  ctx.fillStyle = lighten(color, 0.4);
+  ctx.fillRect(0, -1, 2, 2);
+
+  // Front wing — wide, with white plane and team-colour endplates
+  ctx.fillStyle = "#e8ecf3";
+  roundRect(ctx, 13, -9, 4, 18, 1.2);
+  ctx.fill();
+  ctx.fillStyle = color;
+  ctx.fillRect(13, -9.5, 4, 1.5);
+  ctx.fillRect(13, 8, 4, 1.5);
+
+  // Rear wing — vertical, with endplates
+  ctx.fillStyle = "#1a1f2b";
+  ctx.fillRect(-17.5, -7.5, 1.6, 15);          // beam
+  ctx.fillStyle = color;
+  ctx.fillRect(-18.5, -8.5, 2, 4);             // top-left endplate
+  ctx.fillRect(-18.5, 4.5, 2, 4);              // top-right endplate
+  ctx.fillStyle = "#e8ecf3";
+  ctx.fillRect(-16.5, -6, 0.8, 12);            // light upper element
+
+  // Tiny mirrors
+  ctx.fillStyle = "#0d0f14";
+  ctx.fillRect(3, -5.5, 1.2, 1);
+  ctx.fillRect(3, 4.5, 1.2, 1);
+}
+
+function drawWheel(ctx: CanvasRenderingContext2D, x: number, y: number, scale = 1) {
+  const w = 7 * scale;
+  const h = 3.4 * scale;
+  // Tyre
+  ctx.fillStyle = "#0c0d11";
+  roundRect(ctx, x - w / 2, y - h / 2, w, h, 1.2);
+  ctx.fill();
+  // Sidewall highlight
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.fillRect(x - w / 2 + 1, y - h / 2 + 0.4, w - 2, 0.6);
+  // Hub (small lighter dot)
+  ctx.fillStyle = "#3a3f4d";
+  ctx.beginPath();
+  ctx.ellipse(x, y, 1.2, 0.9, 0, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
