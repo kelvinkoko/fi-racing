@@ -41,6 +41,10 @@ export type Car = {
   // Cached visual state (recomputed each step from authoritative state)
   pos: Vec2;
   angle: number;
+  // Pose at the previous fixed-timestep tick — used to interpolate render
+  // pose between sim ticks so motion stays smooth on high-refresh displays.
+  prevPos: Vec2;
+  prevAngle: number;
   curvature: number;      // signed curvature at current progress
   warning: boolean;       // close to deslot, warn HUD
   input: CarInput;
@@ -71,6 +75,8 @@ export function createSlotCar(seed: {
     deslotSpin: 0,
     pos: { x: sample.pos.x, y: sample.pos.y },
     angle: sample.angle,
+    prevPos: { x: sample.pos.x, y: sample.pos.y },
+    prevAngle: sample.angle,
     curvature: sample.curvature,
     warning: false,
     input: emptyInput(),
@@ -80,6 +86,10 @@ export function createSlotCar(seed: {
 export function stepCar(car: Car, track: Track) {
   const dt = SIM_DT;
   const input = car.input;
+  // Snapshot the pose entering this tick for render-time interpolation.
+  car.prevPos.x = car.pos.x;
+  car.prevPos.y = car.pos.y;
+  car.prevAngle = car.angle;
 
   if (car.desloted) {
     // Free-body drift after flying off, then respawn on the lane.
@@ -173,6 +183,20 @@ function triggerDeslot(car: Car, sample: { pos: Vec2; angle: number }, _k: numbe
   car.deslotAngle = sample.angle;
   car.deslotSpin = (Math.random() * 6 + 4) * outwardSign;
   car.speed = 0;
+}
+
+// Linear interpolation between the previous and current sim pose. `alpha`
+// should be (acc / SIM_DT) so motion stays smooth between fixed-step ticks.
+export function renderPose(car: Car, alpha: number): { x: number; y: number; angle: number } {
+  const a = alpha < 0 ? 0 : alpha > 1 ? 1 : alpha;
+  let dAngle = car.angle - car.prevAngle;
+  while (dAngle > Math.PI) dAngle -= Math.PI * 2;
+  while (dAngle < -Math.PI) dAngle += Math.PI * 2;
+  return {
+    x: car.prevPos.x + (car.pos.x - car.prevPos.x) * a,
+    y: car.prevPos.y + (car.pos.y - car.prevPos.y) * a,
+    angle: car.prevAngle + dAngle * a
+  };
 }
 
 export function clampLane(l: number): number {

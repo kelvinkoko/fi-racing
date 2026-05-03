@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { buildTrack, gridPositions, NUM_LANES } from "../game/track";
 import { renderTrackArt } from "../render/trackRender";
 import { createCamera, drawScene, followCamera, CarVisual } from "../render/scene";
-import { Car, createSlotCar, stepCar } from "../game/car";
+import { Car, createSlotCar, renderPose, stepCar } from "../game/car";
 import { Keyboard } from "../input/keyboard";
 import { TouchControls, isTouchDevice } from "../input/touch";
 import { SIM_DT } from "../game/constants";
@@ -260,28 +260,35 @@ export default function Race({ net, onExit }: Props) {
         if (clientView.finished) finishRace();
       }
 
-      // Camera target.
-      let camTarget = localCar.pos;
+      // Render-time alpha for fixed-timestep interpolation. acc is the
+      // unsimulated time leftover after the last batch of sim ticks.
+      const alpha = Math.max(0, Math.min(1, acc / SIM_DT));
+
+      // Camera target — use the interpolated render pose so the camera
+      // doesn't snap between sim ticks on high-refresh displays.
+      let camTarget = renderPose(localCar, alpha);
       if (isMultiplayer && isHost && hostState) {
         const me = hostState.cars.get(net!.selfId);
-        if (me) camTarget = me.pos;
+        if (me) camTarget = renderPose(me, alpha);
       } else if (isMultiplayer && clientView) {
         const me = clientView.cars.get(net!.selfId);
-        if (me) camTarget = me.pos;
+        if (me) camTarget = { x: me.pos.x, y: me.pos.y, angle: me.angle };
       }
       followCamera(cam, camTarget, canvas.clientWidth, canvas.clientHeight, dt);
 
       // Build car visuals.
       const cars: CarVisual[] = [];
       if (!isMultiplayer) {
+        const r = renderPose(localCar, alpha);
         cars.push({
-          pos: localCar.pos, angle: localCar.angle, color: localCar.color,
+          pos: { x: r.x, y: r.y }, angle: r.angle, color: localCar.color,
           isLocal: true, desloted: localCar.desloted, warning: localCar.warning
         });
       } else if (isHost && hostState) {
         for (const car of hostState.cars.values()) {
+          const r = renderPose(car, alpha);
           cars.push({
-            pos: car.pos, angle: car.angle, color: car.color,
+            pos: { x: r.x, y: r.y }, angle: r.angle, color: car.color,
             isLocal: car.id === net!.selfId,
             desloted: car.desloted, warning: car.warning
           });
