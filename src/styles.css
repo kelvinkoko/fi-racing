@@ -292,6 +292,37 @@ input[type="text"]:focus { border-color: var(--accent-2); }
 }
 .warn-text.dead { color: #ff445f; }
 
+.race-tip {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  border-radius: 14px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  font-size: 30px;
+  pointer-events: none;
+  text-shadow: 0 2px 6px rgba(0,0,0,.55);
+  white-space: nowrap;
+  animation: tip-pulse 0.55s ease-in-out infinite alternate;
+}
+.race-tip.brake {
+  background: rgba(255, 46, 77, 0.88);
+  color: #fff;
+  border: 2px solid #ff8095;
+}
+.race-tip.lane {
+  background: rgba(43, 212, 255, 0.85);
+  color: #0b0d12;
+  border: 2px solid #2bd4ff;
+  font-size: 22px;
+}
+@keyframes tip-pulse {
+  from { transform: translate(-50%, 0) scale(1);    opacity: 0.92; }
+  to   { transform: translate(-50%, 0) scale(1.06); opacity: 1; }
+}
+
 .keys-hint {
   position: absolute;
   bottom: 14px;

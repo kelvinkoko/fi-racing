@@ -25,7 +25,8 @@ type Props = { net?: NetRoom; onExit?: () => void };
 type HudData = {
   lap: number; totalLaps: number; curLap: number; lastLap: number | null;
   bestLap: number | null; total: number; speed: number; maxSafe: number;
-  lane: number; warning: boolean; desloted: boolean; finished: boolean;
+  lane: number; warning: boolean; desloted: boolean; blocked: boolean;
+  finished: boolean;
 };
 
 type StandingsRow = { id: string; name: string; color: string; lap: number; finishMs: number; bestMs: number };
@@ -54,8 +55,9 @@ export default function Race({ net, onExit }: Props) {
   const [touch] = useState(() => isTouchDevice());
   const [hud, setHud] = useState<HudData>({
     lap: 1, totalLaps: TOTAL_LAPS, curLap: 0, lastLap: null, bestLap: null, total: 0,
-    speed: 0, maxSafe: 0, lane: 1, warning: false, desloted: false, finished: false
+    speed: 0, maxSafe: 0, lane: 1, warning: false, desloted: false, blocked: false, finished: false
   });
+  const [tip, setTip] = useState<{ kind: "brake" | "lane"; text: string } | null>(null);
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   const [countdown, setCountdown] = useState<string | null>(null);
   const [ranking, setRanking] = useState<RankRow[]>([]);
@@ -176,6 +178,8 @@ export default function Race({ net, onExit }: Props) {
     let acc = 0;
     let raf = 0;
     let hudTick = 0;
+    let blockedFor = 0;          // seconds the player has been blocked w/o switching lane
+    let prevLaneTarget = 1;
 
     function announceCountdown(at: number) {
       const update = () => {
@@ -346,6 +350,18 @@ export default function Race({ net, onExit }: Props) {
         drawMiniMap(miniCtx, miniBg, miniProj, dots);
       }
 
+      // Track sustained blocking (for the "switch lane" tutorial prompt).
+      // Reset whenever the player commits to a new lane target.
+      const isBlockedNow = currentBlocked(isMultiplayer, isHost, hostState, clientView, localCar, net?.selfId);
+      if (myDesiredLane !== prevLaneTarget) {
+        blockedFor = 0;
+        prevLaneTarget = myDesiredLane;
+      } else if (isBlockedNow && started) {
+        blockedFor += dt;
+      } else {
+        blockedFor = 0;
+      }
+
       hudTick += dt;
       if (hudTick > 0.08) {
         hudTick = 0;
@@ -353,6 +369,17 @@ export default function Race({ net, onExit }: Props) {
         if (data) setHud(data);
         const rank = buildRanking(isMultiplayer, isHost, hostState, clientView, lapState, players, localCar, track.totalLength, net?.selfId);
         setRanking(rank);
+
+        // Pick a tutorial prompt: brake takes priority over lane.
+        let nextTip: { kind: "brake" | "lane"; text: string } | null = null;
+        if (data && started && !data.finished && !data.desloted) {
+          if (data.maxSafe > 0 && data.speed > data.maxSafe + 25) {
+            nextTip = { kind: "brake", text: "BRAKE!" };
+          } else if (data.blocked && blockedFor > 1.5) {
+            nextTip = { kind: "lane", text: "TAP LANE TO PASS" };
+          }
+        }
+        setTip(nextTip);
       }
     };
 
@@ -519,6 +546,9 @@ export default function Race({ net, onExit }: Props) {
       )}
       {countdown && <div className="toast" key={countdown + "-cd"}>{countdown}</div>}
       {toast && !countdown && <div className="toast" key={toast.key}>{toast.text}</div>}
+      {tip && !countdown && (
+        <div className={`race-tip ${tip.kind}`}>{tip.text}</div>
+      )}
       {touch && (
         <div className="touch-controls">
           <div ref={laneLeftRef} className="touch-pad lane-left">◀ LANE</div>
@@ -588,6 +618,7 @@ function pickHudData(
       lane: Math.round(localCar.laneCurrent),
       warning: localCar.warning,
       desloted: localCar.desloted,
+      blocked: localCar.blocked,
       finished: localLap.finished
     };
   }
@@ -607,6 +638,7 @@ function pickHudData(
       lane: car ? Math.round(car.laneCurrent) : myLane,
       warning: !!car?.warning,
       desloted: !!car?.desloted,
+      blocked: !!car?.blocked,
       finished: me.finished
     };
   }
@@ -626,11 +658,23 @@ function pickHudData(
       lane: myLane,
       warning: !!c?.warning,
       desloted: !!c?.desloted,
+      blocked: !!c?.blocked,
       finished: me.finished
     };
   }
   void players;
   return null;
+}
+
+function currentBlocked(
+  isMp: boolean, isHost: boolean,
+  host: HostState | null, client: ClientView | null,
+  localCar: Car, selfId?: string
+): boolean {
+  if (!isMp) return localCar.blocked;
+  if (isHost && host && selfId) return !!host.cars.get(selfId)?.blocked;
+  if (client && selfId) return !!client.cars.get(selfId)?.blocked;
+  return false;
 }
 
 type RankBuildEntry = {

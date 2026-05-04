@@ -52,6 +52,7 @@ export type SnapshotCar = {
   v: number; // forward speed (for HUD)
   d: 0 | 1;  // desloted flag
   w: 0 | 1;  // warning flag
+  bl: 0 | 1; // blocked-by-traffic flag (drives switch-lane prompt)
   p: number; // progress around current lap, 0..1
 };
 

@@ -63,6 +63,9 @@ export type Car = {
   prevAngle: number;
   curvature: number;      // signed curvature at current progress
   warning: boolean;       // close to deslot, warn HUD
+  // True when traffic ahead in the same lane is capping this car's speed
+  // — drives the "switch lane to pass" tutorial prompt for the player.
+  blocked: boolean;
   // Speed cap applied this tick because of a car ahead in the same lane.
   // Reset every tick by the traffic-resolution pass before stepCar runs.
   trafficCap: number;
@@ -98,6 +101,7 @@ export function createSlotCar(seed: {
     prevAngle: sample.angle,
     curvature: sample.curvature,
     warning: false,
+    blocked: false,
     trafficCap: SLOT.topSpeed,
     input: emptyInput(),
   };

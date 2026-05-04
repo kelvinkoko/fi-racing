@@ -108,6 +108,7 @@ function applyTraffic(state: HostState, track: Track) {
 
   for (const a of state.cars.values()) {
     a.trafficCap = SLOT.topSpeed;
+    a.blocked = false;
     if (a.desloted) continue;
     let bestGap = Infinity;
     let leader: Car | null = null;
@@ -122,7 +123,10 @@ function applyTraffic(state: HostState, track: Track) {
         leader = b;
       }
     }
-    if (leader) a.trafficCap = leader.speed;
+    if (leader) {
+      a.trafficCap = leader.speed;
+      a.blocked = true;
+    }
   }
 }
 
@@ -160,6 +164,7 @@ export function buildSnapshot(state: HostState): SnapshotMsg {
       v: round(car.speed, 1),
       d: car.desloted ? 1 : 0,
       w: car.warning ? 1 : 0,
+      bl: car.blocked ? 1 : 0,
       p: round(car.progress, 4)
     });
   }
@@ -213,6 +218,7 @@ export type ClientCarView = {
   speed: number;
   desloted: boolean;
   warning: boolean;
+  blocked: boolean;
   progress: number;
   targetPos?: { x: number; y: number };
   targetAngle?: number;
@@ -240,7 +246,7 @@ export function applySnapshot(view: ClientView, snap: SnapshotMsg) {
     if (!cur) {
       view.cars.set(c.id, {
         pos: { x: c.x, y: c.y }, angle: c.a, speed: c.v,
-        desloted: !!c.d, warning: !!c.w, progress: c.p
+        desloted: !!c.d, warning: !!c.w, blocked: !!c.bl, progress: c.p
       });
     } else {
       cur.targetPos = { x: c.x, y: c.y };
@@ -248,6 +254,7 @@ export function applySnapshot(view: ClientView, snap: SnapshotMsg) {
       cur.speed = c.v;
       cur.desloted = !!c.d;
       cur.warning = !!c.w;
+      cur.blocked = !!c.bl;
       cur.progress = c.p;
     }
   }
