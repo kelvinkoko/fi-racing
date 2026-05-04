@@ -1,6 +1,7 @@
 import { Track } from "../game/track";
 import { TrackArt } from "./trackRender";
 import { Vec2 } from "../game/spline";
+import { Particles } from "./particles";
 
 export type CarVisual = {
   pos: Vec2;
@@ -37,7 +38,8 @@ export function drawScene(
   art: TrackArt,
   cars: CarVisual[],
   viewportW: number,
-  viewportH: number
+  viewportH: number,
+  particles?: Particles
 ) {
   // Backdrop already cleared by caller; draw a vignette/bg first.
   ctx.fillStyle = "#0b0d12";
@@ -57,6 +59,8 @@ export function drawScene(
   );
 
   for (const c of cars) drawCar(ctx, c);
+
+  if (particles) particles.draw(ctx);
 
   ctx.restore();
 

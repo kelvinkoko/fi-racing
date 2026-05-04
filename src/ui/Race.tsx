@@ -3,6 +3,7 @@ import { buildTrack, gridPositions, lookaheadMaxCurvature, NUM_LANES, Track } fr
 import { renderTrackArt } from "../render/trackRender";
 import { buildMiniMapBackground, buildMiniMapProjection, drawMiniMap, MiniDot, MiniMapProjection } from "../render/miniMap";
 import { initEngineAudio, stopEngineAudio, updateEngineAudio } from "../render/engineAudio";
+import { Particles } from "../render/particles";
 import { createCamera, drawScene, followCamera, CarVisual } from "../render/scene";
 import { Car, createSlotCar, KMH_PER_PX_S, maxSafeSpeedFor, renderPose, stepCar } from "../game/car";
 import { Keyboard } from "../input/keyboard";
@@ -104,6 +105,10 @@ export default function Race({ net, onExit }: Props) {
     }
 
     const cam = createCamera();
+    const particles = new Particles();
+    // Track each car's previous deslot state so we can spawn sparks at the
+    // exact moment of transition without re-emitting every frame.
+    const prevDeslotState: Map<string, boolean> = new Map();
     const kb = new Keyboard();
     kb.attach();
     const tc = new TouchControls();
@@ -367,7 +372,46 @@ export default function Race({ net, onExit }: Props) {
       })();
       updateEngineAudio(localSpeed / 470, localThrottle);
 
-      drawScene(ctx, cam, track, art, cars, canvas.clientWidth, canvas.clientHeight);
+      // Detect freshly-desloted cars and pop a spark burst at the impact.
+      for (const c of cars) {
+        const id = (c as CarVisual & { id?: string }).id ?? "";
+        // CarVisual doesn't carry id today; fall back to position lookup
+        // by matching against authoritative state.
+        void id;
+      }
+      const seenIds: string[] = [];
+      const deslotCheck = (id: string, isDesloted: boolean, x: number, y: number, color: string) => {
+        seenIds.push(id);
+        const prev = prevDeslotState.get(id) ?? false;
+        if (!prev && isDesloted) {
+          particles.spawnBurst(x, y, 24, {
+            speedMin: 100, speedMax: 360,
+            lifeMin: 0.5, lifeMax: 1.0,
+            sizeMin: 1, sizeMax: 2.6,
+            color: (i) => i % 3 === 0 ? color : (i % 3 === 1 ? "#ffd23f" : "#ff8a3a")
+          });
+        }
+        prevDeslotState.set(id, isDesloted);
+      };
+      if (!isMultiplayer) {
+        deslotCheck(localCar.id, localCar.desloted, localCar.pos.x, localCar.pos.y, localCar.color);
+      } else if (isHost && hostState) {
+        for (const car of hostState.cars.values()) {
+          deslotCheck(car.id, car.desloted, car.pos.x, car.pos.y, car.color);
+        }
+      } else if (clientView) {
+        for (const [id, c] of clientView.cars) {
+          const info = players.find((p) => p.id === id);
+          deslotCheck(id, c.desloted, c.pos.x, c.pos.y, info ? CAR_COLORS[info.colorIndex] : "#888");
+        }
+      }
+      // Drop departed cars from the previous-state map.
+      for (const id of [...prevDeslotState.keys()]) {
+        if (!seenIds.includes(id)) prevDeslotState.delete(id);
+      }
+      particles.update(dt);
+
+      drawScene(ctx, cam, track, art, cars, canvas.clientWidth, canvas.clientHeight, particles);
 
       if (miniCtx) {
         const dots: MiniDot[] = cars.map((c) => ({
