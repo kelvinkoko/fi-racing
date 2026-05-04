@@ -6,11 +6,17 @@ export type LapState = {
   totalLaps: number;
   lapTimes: number[];
   bestLap: number | null;
-  currentLapStart: number; // sim time (seconds)
+  currentLapStart: number; // sim time (seconds) when the current lap began
   raceStart: number;
   finished: boolean;
   finishTime: number | null;
   prevProgress: number;
+  // Cars spawn behind the line and the very first crossing happens within
+  // a few seconds of starting — that crossing is the race officially
+  // starting (lights-out → cross the line for the first time), not a
+  // completed lap. We swallow it instead of pushing a tiny "best lap" of
+  // ~1–3 seconds.
+  raceStarted: boolean;
 };
 
 export function newLapState(totalLaps: number, now: number): LapState {
@@ -23,7 +29,8 @@ export function newLapState(totalLaps: number, now: number): LapState {
     raceStart: now,
     finished: false,
     finishTime: null,
-    prevProgress: 1.0 // cars start just behind the line
+    prevProgress: 1.0, // cars start just behind the line
+    raceStarted: false
   };
 }
 
@@ -41,6 +48,15 @@ export function tickLap(state: LapState, car: Car, _track: Track, now: number): 
   const lapTime = now - state.currentLapStart;
   // Reject crossings during the first half-second to avoid spawn-position glitches.
   if (lapTime < 0.5) {
+    state.currentLapStart = now;
+    return false;
+  }
+
+  // First crossing after the lights go out is just the race officially
+  // beginning, not a completed lap. Reset the lap timer here so the next
+  // crossing produces the real first-lap time.
+  if (!state.raceStarted) {
+    state.raceStarted = true;
     state.currentLapStart = now;
     return false;
   }
