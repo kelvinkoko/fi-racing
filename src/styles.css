@@ -250,14 +250,17 @@ input[type="text"]:focus { border-color: var(--accent-2); }
   margin-top: 6px;
 }
 .lane-pip {
-  width: 14px;
-  height: 6px;
+  width: 18px;
+  height: 8px;
   border-radius: 3px;
   background: rgba(255,255,255,0.18);
+  transition: background 120ms linear, box-shadow 120ms linear;
+  outline: 1px solid transparent;
+  outline-offset: 1px;
 }
 .lane-pip.on {
-  background: var(--accent-2);
-  box-shadow: 0 0 8px rgba(43, 212, 255, 0.7);
+  outline-color: var(--accent-2);
+  box-shadow: 0 0 8px rgba(43, 212, 255, 0.65);
 }
 
 .speed-big.warn { color: #ffd23f; text-shadow: 0 0 12px rgba(255, 210, 64, 0.7); }

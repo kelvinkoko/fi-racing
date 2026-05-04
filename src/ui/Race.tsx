@@ -30,6 +30,10 @@ type HudData = {
   lap: number; totalLaps: number; curLap: number; lastLap: number | null;
   bestLap: number | null; total: number; speed: number; maxSafe: number;
   lane: number; warning: boolean; desloted: boolean; blocked: boolean;
+  // Per-lane lookahead safe speed (px/s) at the player's current
+  // progress. Drives the colour of each lane pip so the player sees at
+  // a glance which lane has the most grip for the upcoming corner.
+  laneSafe: number[];
   finished: boolean;
 };
 
@@ -66,7 +70,8 @@ export default function Race({ net, onExit, timeTrial }: Props) {
   const [touch] = useState(() => isTouchDevice());
   const [hud, setHud] = useState<HudData>({
     lap: 1, totalLaps: lapCount, curLap: 0, lastLap: null, bestLap: null, total: 0,
-    speed: 0, maxSafe: 0, lane: 1, warning: false, desloted: false, blocked: false, finished: false
+    speed: 0, maxSafe: 0, lane: 1, warning: false, desloted: false, blocked: false,
+    laneSafe: [0, 0, 0], finished: false
   });
   const [tip, setTip] = useState<{ kind: "brake" | "lane"; text: string } | null>(null);
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
@@ -595,9 +600,13 @@ export default function Race({ net, onExit, timeTrial }: Props) {
         {timeTrial
           ? <div className="meta">Record {savedBestLap !== null ? formatTime(savedBestLap) : "—"}</div>
           : <div className="meta">Total {formatTime(hud.total)}</div>}
-        <div className="lane-pips">
+        <div className="lane-pips" title="Grip per lane (red = will deslot, green = safe)">
           {Array.from({ length: NUM_LANES }, (_, i) => (
-            <span key={i} className={"lane-pip" + (i === hud.lane ? " on" : "")} />
+            <span
+              key={i}
+              className={"lane-pip" + (i === hud.lane ? " on" : "")}
+              style={{ background: lanePipColor(hud.laneSafe[i] ?? 0, hud.speed) }}
+            />
           ))}
         </div>
         <div className="minimap">
@@ -689,6 +698,19 @@ function speedBarColor(h: HudData): string {
   return "#36d399";
 }
 
+// Colour a lane pip by how this lane's safe speed compares to the player's
+// current speed. Red = you would fly off if you switched here, yellow =
+// close to the limit, green = comfortable. With the lane pips shown side
+// by side, the player can see which lane has the most grip for the next
+// corner without any text prompt.
+function lanePipColor(laneSafe: number, currentSpeed: number): string {
+  if (laneSafe <= 0) return "rgba(255,255,255,0.18)";
+  const ratio = currentSpeed > 0 ? currentSpeed / laneSafe : 0;
+  if (ratio >= 1.0) return "rgba(255, 68, 95, 0.85)";   // would deslot
+  if (ratio >= 0.85) return "rgba(255, 210, 64, 0.85)"; // marginal
+  return "rgba(54, 211, 153, 0.85)";                    // safe
+}
+
 function pickHudData(
   isMp: boolean, isHost: boolean,
   host: HostState | null, client: ClientView | null,
@@ -701,6 +723,11 @@ function pickHudData(
   const safeFromProgress = (p: number, lane: number) => {
     const k = lookaheadMaxCurvature(track, p, lookaheadDist, lane);
     return Math.round(maxSafeSpeedFor(k));
+  };
+  const laneSafeAt = (p: number) => {
+    const arr: number[] = [];
+    for (let i = 0; i < NUM_LANES; i++) arr.push(safeFromProgress(p, i));
+    return arr;
   };
   if (!isMp) {
     return {
@@ -716,6 +743,7 @@ function pickHudData(
       warning: localCar.warning,
       desloted: localCar.desloted,
       blocked: localCar.blocked,
+      laneSafe: laneSafeAt(localCar.progress),
       finished: localLap.finished
     };
   }
@@ -736,6 +764,7 @@ function pickHudData(
       warning: !!car?.warning,
       desloted: !!car?.desloted,
       blocked: !!car?.blocked,
+      laneSafe: car ? laneSafeAt(car.progress) : [0, 0, 0],
       finished: me.finished
     };
   }
@@ -756,6 +785,7 @@ function pickHudData(
       warning: !!c?.warning,
       desloted: !!c?.desloted,
       blocked: !!c?.blocked,
+      laneSafe: c ? laneSafeAt(c.progress) : [0, 0, 0],
       finished: me.finished
     };
   }
