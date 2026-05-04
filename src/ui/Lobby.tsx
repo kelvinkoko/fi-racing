@@ -5,19 +5,32 @@ import { CAR_COLORS, LobbyMsg } from "../net/protocol";
 
 type Props = {
   net: NetRoom;
-  onStart: () => void;
+  onStart: (totalLaps: number) => void;
   onLeave: () => void;
 };
+
+const LAP_OPTIONS = [3, 5, 10, 20];
+const LAP_KEY = "fi-racing.totalLaps";
+
+function loadInitialLaps(): number {
+  const v = localStorage.getItem(LAP_KEY);
+  const n = v ? Number(v) : 5;
+  return LAP_OPTIONS.includes(n) ? n : 5;
+}
 
 export default function Lobby({ net, onStart, onLeave }: Props) {
   const [lobby, setLobby] = useState<LobbyMsg>(() => net.snapshotLobby());
   const [copied, setCopied] = useState(false);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [selectedLaps, setSelectedLaps] = useState<number>(loadInitialLaps);
 
   useEffect(() => {
     net.on({ onLobby: setLobby });
     net.broadcastHello();
-    const off = net.onStartPersistent(() => onStart());
+    // Clients receive the host's start broadcast here. The msg carries the
+    // chosen totalLaps so the client transitions to the race using the
+    // same value the host picked.
+    const off = net.onStartPersistent((msg) => onStart(msg.totalLaps));
     return off;
   }, [net, onStart]);
 
@@ -36,6 +49,11 @@ export default function Lobby({ net, onStart, onLeave }: Props) {
     }).catch((e) => console.error("QR generation failed", e));
     return () => { cancelled = true; };
   }, [link]);
+
+  const handleStart = () => {
+    localStorage.setItem(LAP_KEY, String(selectedLaps));
+    onStart(selectedLaps);
+  };
 
   return (
     <div className="lobby">
@@ -82,11 +100,25 @@ export default function Lobby({ net, onStart, onLeave }: Props) {
           }}>{copied ? "Copied" : "Copy"}</button>
         </div>
 
+        {isHost && (
+          <div className="row lap-selector">
+            <span className="lap-selector-label">Laps</span>
+            {LAP_OPTIONS.map((n) => (
+              <button
+                key={n}
+                className={"lap-pill" + (n === selectedLaps ? " active" : "")}
+                onClick={() => setSelectedLaps(n)}
+              >{n}</button>
+            ))}
+            <div className="spacer" />
+          </div>
+        )}
+
         <div className="row" style={{ marginTop: 16 }}>
           <button onClick={onLeave}>Leave</button>
           <div className="spacer" />
           {isHost ? (
-            <button className="primary" onClick={onStart} disabled={lobby.players.length < 1}>
+            <button className="primary" onClick={handleStart} disabled={lobby.players.length < 1}>
               Start race
             </button>
           ) : (

@@ -24,7 +24,7 @@ const BEST_LAP_KEY = "fi-racing.bestlap.circuit-alpha";
 const SNAPSHOT_HZ = 20;
 const INPUT_HZ = 30;
 
-type Props = { net?: NetRoom; onExit?: () => void; timeTrial?: boolean };
+type Props = { net?: NetRoom; onExit?: () => void; timeTrial?: boolean; totalLaps?: number };
 
 type HudData = {
   lap: number; totalLaps: number; curLap: number; lastLap: number | null;
@@ -53,8 +53,8 @@ type RankRow = {
   gap: string;
 };
 
-export default function Race({ net, onExit, timeTrial }: Props) {
-  const lapCount = timeTrial ? TIME_TRIAL_LAPS : TOTAL_LAPS;
+export default function Race({ net, onExit, timeTrial, totalLaps }: Props) {
+  const lapCount = timeTrial ? TIME_TRIAL_LAPS : (totalLaps ?? TOTAL_LAPS);
   const [savedBestLap, setSavedBestLap] = useState<number | null>(() => {
     const v = localStorage.getItem(BEST_LAP_KEY);
     if (!v) return null;
@@ -453,9 +453,9 @@ export default function Race({ net, onExit, timeTrial }: Props) {
       hudTick += dt;
       if (hudTick > 0.08) {
         hudTick = 0;
-        const data = pickHudData(isMultiplayer, isHost, hostState, clientView, lapState, simTime, players, localCar, myDesiredLane, track, net?.selfId);
+        const data = pickHudData(isMultiplayer, isHost, hostState, clientView, lapState, simTime, players, localCar, myDesiredLane, track, lapCount, net?.selfId);
         if (data) setHud(data);
-        const rank = buildRanking(isMultiplayer, isHost, hostState, clientView, lapState, players, localCar, track.totalLength, net?.selfId);
+        const rank = buildRanking(isMultiplayer, isHost, hostState, clientView, lapState, players, localCar, track.totalLength, lapCount, net?.selfId);
         setRanking(rank);
 
         // Pick a tutorial prompt: brake takes priority over lane.
@@ -716,7 +716,7 @@ function pickHudData(
   host: HostState | null, client: ClientView | null,
   localLap: LapState, localSim: number,
   players: PlayerInfo[], localCar: Car, myLane: number,
-  track: Track, selfId?: string
+  track: Track, lapCount: number, selfId?: string
 ): HudData | null {
   // Look ~1 second of top-speed travel ahead so the player has time to brake.
   const lookaheadDist = 500;
@@ -774,7 +774,7 @@ function pickHudData(
     if (!me) return null;
     return {
       lap: me.lap,
-      totalLaps: TOTAL_LAPS,
+      totalLaps: lapCount,
       curLap: 0,
       lastLap: null,
       bestLap: me.bestMs ? me.bestMs / 1000 : null,
@@ -821,7 +821,7 @@ function buildRanking(
   host: HostState | null, client: ClientView | null,
   localLap: LapState,
   players: PlayerInfo[], localCar: Car,
-  trackLength: number, selfId?: string
+  trackLength: number, lapCount: number, selfId?: string
 ): RankRow[] {
   const entries: RankBuildEntry[] = [];
 
@@ -863,7 +863,7 @@ function buildRanking(
         isLocal: id === selfId,
         totalDistance: (lapsCompleted + (c.progress ?? 0)) * trackLength,
         lap: lapNum,
-        totalLaps: TOTAL_LAPS,
+        totalLaps: lapCount,
         finished: !!lap?.finished,
         finishMs: lap?.finishMs ?? 0
       });

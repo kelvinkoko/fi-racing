@@ -8,6 +8,7 @@ type Screen = "menu" | "lobby" | "race" | "timetrial";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("menu");
+  const [chosenLaps, setChosenLaps] = useState<number>(5);
   const netRef = useRef<NetRoom | null>(null);
   const [, force] = useState(0);
 
@@ -42,12 +43,13 @@ export default function App() {
     setScreen("menu");
   }
 
-  function startRace() {
+  function startRace(laps: number) {
+    setChosenLaps(laps);
     setScreen("race");
   }
 
   if (screen === "race" && netRef.current) {
-    return <Race net={netRef.current} onExit={leaveRoom} />;
+    return <Race net={netRef.current} onExit={leaveRoom} totalLaps={chosenLaps} />;
   }
   if (screen === "timetrial") {
     return <Race onExit={leaveRoom} timeTrial />;
