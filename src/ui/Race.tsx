@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { buildTrack, gridPositions, lookaheadMaxCurvature, NUM_LANES, Track } from "../game/track";
 import { renderTrackArt } from "../render/trackRender";
 import { buildMiniMapBackground, buildMiniMapProjection, drawMiniMap, MiniDot, MiniMapProjection } from "../render/miniMap";
+import { initEngineAudio, stopEngineAudio, updateEngineAudio } from "../render/engineAudio";
 import { createCamera, drawScene, followCamera, CarVisual } from "../render/scene";
 import { Car, createSlotCar, KMH_PER_PX_S, maxSafeSpeedFor, renderPose, stepCar } from "../game/car";
 import { Keyboard } from "../input/keyboard";
@@ -181,6 +182,15 @@ export default function Race({ net, onExit }: Props) {
     let blockedFor = 0;          // seconds the player has been blocked w/o switching lane
     let prevLaneTarget = 1;
 
+    // Engine audio: needs a user gesture before AudioContext will play.
+    const initAudioOnGesture = () => {
+      initEngineAudio();
+      window.removeEventListener("pointerdown", initAudioOnGesture);
+      window.removeEventListener("keydown", initAudioOnGesture);
+    };
+    window.addEventListener("pointerdown", initAudioOnGesture);
+    window.addEventListener("keydown", initAudioOnGesture);
+
     function announceCountdown(at: number) {
       const update = () => {
         const remain = (at - performance.now()) / 1000;
@@ -340,6 +350,23 @@ export default function Race({ net, onExit }: Props) {
         }
       }
 
+      // Engine audio for the local player.
+      const localSpeed = (() => {
+        if (isMultiplayer && isHost && hostState) {
+          return hostState.cars.get(net!.selfId)?.speed ?? 0;
+        }
+        if (isMultiplayer && clientView) {
+          return clientView.cars.get(net!.selfId)?.speed ?? 0;
+        }
+        return localCar.speed;
+      })();
+      const localThrottle = (() => {
+        if (!isMultiplayer) return localCar.input.throttle;
+        const me = isHost && hostState ? hostState.inputs.get(net!.selfId) : null;
+        return me ? me.throttle : 0;
+      })();
+      updateEngineAudio(localSpeed / 470, localThrottle);
+
       drawScene(ctx, cam, track, art, cars, canvas.clientWidth, canvas.clientHeight);
 
       if (miniCtx) {
@@ -442,6 +469,9 @@ export default function Race({ net, onExit }: Props) {
       ro.disconnect();
       window.removeEventListener("resize", ensureSize);
       window.removeEventListener("orientationchange", ensureSize);
+      window.removeEventListener("pointerdown", initAudioOnGesture);
+      window.removeEventListener("keydown", initAudioOnGesture);
+      stopEngineAudio();
     };
     } // end setup()
     // eslint-disable-next-line react-hooks/exhaustive-deps
