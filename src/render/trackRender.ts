@@ -114,32 +114,43 @@ function drawRunoff(ctx: CanvasRenderingContext2D, track: Track) {
 }
 
 function drawAsphalt(ctx: CanvasRenderingContext2D, track: Track) {
-  // Asphalt body (between inner and outer ring).
+  // Slot-car body: glossy near-black plastic with a focused top-light
+  // highlight (like the model is sitting on a table under a single bulb).
   ctx.beginPath();
   polyPath(ctx, track.outer);
   polyPath(ctx, [...track.inner].reverse());
-  ctx.fillStyle = "#2a2d33";
+  ctx.fillStyle = "#0d0f15";
   ctx.fill("evenodd");
 
-  // Subtle radial sheen via a clipped overlay.
+  // Inner darker shading near the edges — fakes a slightly rolled plastic
+  // edge so the track reads as a solid moulded piece rather than a flat
+  // painted shape.
   ctx.save();
   ctx.beginPath();
   polyPath(ctx, track.outer);
   polyPath(ctx, [...track.inner].reverse());
   ctx.clip("evenodd");
+
+  // Cool blue-white plastic highlight, biased upper-left to imply lighting.
   const cx = (track.bounds.minX + track.bounds.maxX) / 2;
   const cy = (track.bounds.minY + track.bounds.maxY) / 2;
   const r = Math.hypot(track.bounds.maxX - cx, track.bounds.maxY - cy);
-  const sheen = ctx.createRadialGradient(cx, cy, r * 0.1, cx, cy, r);
-  sheen.addColorStop(0, "rgba(255,255,255,0.06)");
-  sheen.addColorStop(1, "rgba(0,0,0,0.25)");
+  const sheen = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.45, r * 0.05, cx, cy, r);
+  sheen.addColorStop(0,    "rgba(180, 200, 225, 0.22)");
+  sheen.addColorStop(0.35, "rgba(60, 70, 90, 0.05)");
+  sheen.addColorStop(1,    "rgba(0, 0, 0, 0.35)");
   ctx.fillStyle = sheen;
-  ctx.fillRect(track.bounds.minX - 200, track.bounds.minY - 200, (track.bounds.maxX - track.bounds.minX) + 400, (track.bounds.maxY - track.bounds.minY) + 400);
+  ctx.fillRect(
+    track.bounds.minX - 200,
+    track.bounds.minY - 200,
+    (track.bounds.maxX - track.bounds.minX) + 400,
+    (track.bounds.maxY - track.bounds.minY) + 400
+  );
   ctx.restore();
 
-  // Edge lines (white outer, white inner).
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = "#f1f3f7";
+  // Edge lines — bright white, a touch thicker for a moulded look.
+  ctx.lineWidth = 2.6;
+  ctx.strokeStyle = "#f3f6fb";
   strokeClosed(ctx, track.outer);
   strokeClosed(ctx, track.inner);
 }
@@ -274,9 +285,9 @@ function drawLaneStripes(ctx: CanvasRenderingContext2D, track: Track) {
   // guides. Boundaries between lanes get a subtle solid line.
   const samples = track.center.length;
   ctx.save();
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1.6;
   ctx.setLineDash([10, 14]);
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+  ctx.strokeStyle = "rgba(235, 240, 250, 0.32)";
   for (const off of LANE_OFFSETS) {
     ctx.beginPath();
     for (let i = 0; i <= samples; i++) {
