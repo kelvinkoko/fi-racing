@@ -98,6 +98,11 @@ export function stepHost(state: HostState, track: Track) {
 // Two cars are "in the same lane" if their smooth lane positions are within
 // half a lane of each other. Easing into a different lane lifts the cap.
 const SAME_LANE_TOL = 0.5;
+// Slipstream catchment is wider — you only need to be roughly behind another
+// car (within ~1.8 lanes) to get a tow.
+const DRAFT_LANE_TOL = 1.8;
+// Slipstream gap window in car-lengths.
+const DRAFT_GAP_CARLENS = 3;
 // Ignore traffic gaps > 30% of a lap — that's a lapping situation, not a
 // follow.
 const FAR_GAP = 0.3;
@@ -105,20 +110,29 @@ const FAR_GAP = 0.3;
 function applyTraffic(state: HostState, track: Track) {
   const carLen = CAR_LENGTH_PX / track.totalLength;
   const followGap = carLen * 1.5;
+  const draftGap = carLen * DRAFT_GAP_CARLENS;
 
   for (const a of state.cars.values()) {
     a.trafficCap = SLOT.topSpeed;
     a.blocked = false;
+    a.slipstream = false;
     if (a.desloted) continue;
     let bestGap = Infinity;
     let leader: Car | null = null;
     for (const b of state.cars.values()) {
       if (a === b || b.desloted) continue;
-      if (Math.abs(a.laneCurrent - b.laneCurrent) > SAME_LANE_TOL) continue;
       let gap = b.progress - a.progress;
       if (gap < 0) gap += 1;
-      if (gap > FAR_GAP || gap > followGap) continue;
-      if (gap < bestGap) {
+      if (gap > FAR_GAP) continue;
+      const laneDelta = Math.abs(a.laneCurrent - b.laneCurrent);
+
+      // Slipstream — wider lane tolerance, generous gap window.
+      if (gap < draftGap && laneDelta <= DRAFT_LANE_TOL) {
+        a.slipstream = true;
+      }
+
+      // Same-lane following: the trailing car can't outrun the leader.
+      if (laneDelta <= SAME_LANE_TOL && gap < followGap && gap < bestGap) {
         bestGap = gap;
         leader = b;
       }

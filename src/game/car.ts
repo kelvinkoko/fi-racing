@@ -17,6 +17,7 @@ export const SLOT = {
   drag: 0.40,
   rollingFriction: 35,
   topSpeed: 470,         // ≈ 338 km/h (PX_PER_METER = 5)
+  slipstreamBonus: 0.10, // +10 % top speed while drafting a car ahead
   // Lateral acceleration ceiling. Real F1 peaks near 5g; we sit a bit
   // above that for arcade forgiveness so a slight overshoot through a
   // corner doesn't immediately fling you off — only genuinely too fast
@@ -66,6 +67,10 @@ export type Car = {
   // True when traffic ahead in the same lane is capping this car's speed
   // — drives the "switch lane to pass" tutorial prompt for the player.
   blocked: boolean;
+  // True when there is another car a few car-lengths directly ahead
+  // (any lane, including the same one). Slipstreaming temporarily
+  // raises the speed cap so a trailing car gets a tow on the straight.
+  slipstream: boolean;
   // Speed cap applied this tick because of a car ahead in the same lane.
   // Reset every tick by the traffic-resolution pass before stepCar runs.
   trafficCap: number;
@@ -102,6 +107,7 @@ export function createSlotCar(seed: {
     curvature: sample.curvature,
     warning: false,
     blocked: false,
+    slipstream: false,
     trafficCap: SLOT.topSpeed,
     input: emptyInput(),
   };
@@ -159,7 +165,7 @@ export function stepCar(car: Car, track: Track) {
   v -= v * SLOT.drag * dt;
 
   // Speed cap.
-  const top = SLOT.topSpeed;
+  const top = SLOT.topSpeed * (car.slipstream ? 1 + SLOT.slipstreamBonus : 1);
   if (v > top) v = top;
   // Cap by traffic ahead in the same lane.
   if (v > car.trafficCap) v = car.trafficCap;
