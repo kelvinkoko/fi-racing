@@ -18,11 +18,13 @@ import {
 } from "../net/raceLoop";
 
 const TOTAL_LAPS = 5;
+const TIME_TRIAL_LAPS = 999;
 const REFERENCE_SPEED = 280; // px/s used to convert track-distance gaps into seconds
+const BEST_LAP_KEY = "fi-racing.bestlap.circuit-alpha";
 const SNAPSHOT_HZ = 20;
 const INPUT_HZ = 30;
 
-type Props = { net?: NetRoom; onExit?: () => void };
+type Props = { net?: NetRoom; onExit?: () => void; timeTrial?: boolean };
 
 type HudData = {
   lap: number; totalLaps: number; curLap: number; lastLap: number | null;
@@ -47,7 +49,14 @@ type RankRow = {
   gap: string;
 };
 
-export default function Race({ net, onExit }: Props) {
+export default function Race({ net, onExit, timeTrial }: Props) {
+  const lapCount = timeTrial ? TIME_TRIAL_LAPS : TOTAL_LAPS;
+  const [savedBestLap, setSavedBestLap] = useState<number | null>(() => {
+    const v = localStorage.getItem(BEST_LAP_KEY);
+    if (!v) return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  });
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gasRef = useRef<HTMLDivElement | null>(null);
   const brakeRef = useRef<HTMLDivElement | null>(null);
@@ -56,7 +65,7 @@ export default function Race({ net, onExit }: Props) {
   const miniMapRef = useRef<HTMLCanvasElement | null>(null);
   const [touch] = useState(() => isTouchDevice());
   const [hud, setHud] = useState<HudData>({
-    lap: 1, totalLaps: TOTAL_LAPS, curLap: 0, lastLap: null, bestLap: null, total: 0,
+    lap: 1, totalLaps: lapCount, curLap: 0, lastLap: null, bestLap: null, total: 0,
     speed: 0, maxSafe: 0, lane: 1, warning: false, desloted: false, blocked: false, finished: false
   });
   const [tip, setTip] = useState<{ kind: "brake" | "lane"; text: string } | null>(null);
@@ -170,7 +179,7 @@ export default function Race({ net, onExit }: Props) {
     cam.x = localCar.pos.x; cam.y = localCar.pos.y;
 
     let simTime = 0;
-    const lapState: LapState = newLapState(TOTAL_LAPS, simTime);
+    const lapState: LapState = newLapState(lapCount, simTime);
 
     // ---- Host & client networking state ----
     let hostState: HostState | null = null;
@@ -215,8 +224,8 @@ export default function Race({ net, onExit }: Props) {
       hostId = net!.snapshotLobby().hostId;
 
       if (isHost) {
-        hostState = step("createHostState", () => createHostState(players, track, TOTAL_LAPS));
-        const startMsg: StartMsg = step("makeStartMsg", () => makeStartMsg(players, TOTAL_LAPS));
+        hostState = step("createHostState", () => createHostState(players, track, lapCount));
+        const startMsg: StartMsg = step("makeStartMsg", () => makeStartMsg(players, lapCount));
         step("recordOwnStart", () => net!.recordOwnStart(startMsg));
         step("broadcastStart", () => net!.broadcastStart(startMsg));
         const me = hostState.cars.get(net!.selfId);
@@ -460,7 +469,16 @@ export default function Race({ net, onExit }: Props) {
       } else if (lap.lapTimes.length) {
         const last = lap.lapTimes[lap.lapTimes.length - 1];
         const isBest = lap.bestLap !== null && Math.abs(last - lap.bestLap) < 1e-6;
-        setToast({ text: `Lap ${lap.currentLap - 1}: ${formatTime(last)}${isBest ? " ★" : ""}`, key: performance.now() });
+        // Time-trial mode: persist a new all-time best to localStorage and
+        // show a star when the player has beaten their previous record.
+        let beatRecord = false;
+        if (timeTrial && (savedBestLap === null || last < savedBestLap)) {
+          localStorage.setItem(BEST_LAP_KEY, String(last));
+          setSavedBestLap(last);
+          beatRecord = true;
+        }
+        const star = beatRecord ? " 🏆" : isBest ? " ★" : "";
+        setToast({ text: `Lap ${lap.currentLap - 1}: ${formatTime(last)}${star}`, key: performance.now() });
       }
     }
 
@@ -568,10 +586,12 @@ export default function Race({ net, onExit }: Props) {
     <div className="race">
       <canvas ref={canvasRef} />
       <div className="hud">
-        <div className="lap">Lap {hud.lap} / {hud.totalLaps}</div>
+        <div className="lap">{timeTrial ? `Lap ${hud.lap}` : `Lap ${hud.lap} / ${hud.totalLaps}`}</div>
         <div className="timer">{formatTime(hud.curLap)}</div>
         <div className="meta">Last {formatTime(hud.lastLap ?? -1)} · Best {formatTime(hud.bestLap ?? -1)}</div>
-        <div className="meta">Total {formatTime(hud.total)}</div>
+        {timeTrial
+          ? <div className="meta">Record {savedBestLap !== null ? formatTime(savedBestLap) : "—"}</div>
+          : <div className="meta">Total {formatTime(hud.total)}</div>}
         <div className="lane-pips">
           {Array.from({ length: NUM_LANES }, (_, i) => (
             <span key={i} className={"lane-pip" + (i === hud.lane ? " on" : "")} />

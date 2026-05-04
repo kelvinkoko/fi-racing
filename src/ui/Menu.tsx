@@ -3,12 +3,13 @@ import { generateRoomCode } from "../net/room";
 
 type Props = {
   onEnter: (room: string, name: string) => void;
+  onTimeTrial?: () => void;
   initialRoom?: string;
 };
 
 const NAME_KEY = "fi-racing.name";
 
-export default function Menu({ onEnter, initialRoom = "" }: Props) {
+export default function Menu({ onEnter, onTimeTrial, initialRoom = "" }: Props) {
   const [name, setName] = useState<string>(() => localStorage.getItem(NAME_KEY) ?? "");
   const [join, setJoin] = useState(initialRoom);
 
@@ -38,6 +39,9 @@ export default function Menu({ onEnter, initialRoom = "" }: Props) {
           <button className="primary" onClick={() => commit(generateRoomCode())}>
             Create race
           </button>
+          {onTimeTrial && (
+            <button onClick={onTimeTrial}>Time trial</button>
+          )}
           <div className="spacer" />
         </div>
 

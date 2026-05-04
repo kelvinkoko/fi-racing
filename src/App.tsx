@@ -4,7 +4,7 @@ import Menu from "./ui/Menu";
 import Lobby from "./ui/Lobby";
 import { NetRoom, getRoomFromHash, setRoomInHash } from "./net/room";
 
-type Screen = "menu" | "lobby" | "race";
+type Screen = "menu" | "lobby" | "race" | "timetrial";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("menu");
@@ -28,6 +28,13 @@ export default function App() {
     force((n) => n + 1);
   }
 
+  function enterTimeTrial() {
+    netRef.current?.leave();
+    netRef.current = null;
+    location.hash = "";
+    setScreen("timetrial");
+  }
+
   function leaveRoom() {
     netRef.current?.leave();
     netRef.current = null;
@@ -42,11 +49,13 @@ export default function App() {
   if (screen === "race" && netRef.current) {
     return <Race net={netRef.current} onExit={leaveRoom} />;
   }
+  if (screen === "timetrial") {
+    return <Race onExit={leaveRoom} timeTrial />;
+  }
   if (screen === "lobby" && netRef.current) {
     return <Lobby net={netRef.current} onStart={startRace} onLeave={leaveRoom} />;
   }
 
-  // Pre-fill room code into Menu via Menu's join field if hash is present.
   const prefilledRoom = getRoomFromHash() ?? "";
-  return <Menu key={prefilledRoom} onEnter={enterRoom} initialRoom={prefilledRoom} />;
+  return <Menu key={prefilledRoom} onEnter={enterRoom} onTimeTrial={enterTimeTrial} initialRoom={prefilledRoom} />;
 }
