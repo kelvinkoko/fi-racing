@@ -11,6 +11,7 @@ export type CarVisual = {
   isLocal?: boolean;
   desloted?: boolean;
   warning?: boolean;
+  braking?: boolean;
 };
 
 export type Camera = {
@@ -84,7 +85,7 @@ function drawCar(ctx: CanvasRenderingContext2D, car: CarVisual) {
   }
   if (car.desloted) ctx.globalAlpha = 0.7;
 
-  drawF1Body(ctx, car.color);
+  drawF1Body(ctx, car.color, !!car.braking);
 
   ctx.shadowBlur = 0;
 
@@ -95,7 +96,7 @@ function drawCar(ctx: CanvasRenderingContext2D, car: CarVisual) {
 // of travel). Total footprint roughly 44 long × 22 wide including the
 // front wing. Silhouette is deliberately rear-wide / nose-narrow so the
 // orientation reads at a glance from a top-down view.
-function drawF1Body(ctx: CanvasRenderingContext2D, color: string) {
+function drawF1Body(ctx: CanvasRenderingContext2D, color: string, braking: boolean) {
   const lighter = lighten(color, 0.22);
   const darker = darken(color, 0.22);
 
@@ -173,6 +174,20 @@ function drawF1Body(ctx: CanvasRenderingContext2D, color: string) {
   ctx.fillStyle = color;
   ctx.fillRect(-19.5, -7.5, 1.6, 3); // tiny endplate (top-left)
   ctx.fillRect(-19.5, 4.5, 1.6, 3);  // tiny endplate (bottom-left)
+
+  // Brake light on the rear-wing centerline. Bright red with a glow when
+  // the player is on the brake; dim when off so the position is still
+  // visible at a glance.
+  if (braking) {
+    ctx.shadowColor = "rgba(255, 60, 80, 0.95)";
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = "#ff3344";
+    ctx.fillRect(-17.6, -2, 1.4, 4);
+    ctx.shadowBlur = 0;
+  } else {
+    ctx.fillStyle = "#5a1a22";
+    ctx.fillRect(-17.6, -2, 1.4, 4);
+  }
 }
 
 function drawWheel(ctx: CanvasRenderingContext2D, x: number, y: number, scale = 1) {

@@ -283,6 +283,13 @@ input[type="text"]:focus { border-color: var(--accent-2); }
   transition: width 80ms linear, background 120ms linear;
   box-shadow: 0 0 6px rgba(0,0,0,0.4);
 }
+.speed-bar-fill.over {
+  animation: speed-bar-redline 0.18s linear infinite alternate;
+}
+@keyframes speed-bar-redline {
+  from { box-shadow: 0 0 6px rgba(255, 68, 95, 0.4); filter: brightness(1); }
+  to   { box-shadow: 0 0 14px rgba(255, 68, 95, 0.95); filter: brightness(1.5); }
+}
 .warn-text {
   font-size: 13px;
   font-weight: 800;

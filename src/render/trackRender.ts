@@ -71,15 +71,46 @@ function drawGrass(ctx: CanvasRenderingContext2D, track: Track, padding: number)
 }
 
 function drawRunoff(ctx: CanvasRenderingContext2D, track: Track) {
-  // Wider sand/gravel ring, slightly offset so it shows around the curbs.
+  // Variable run-off: gravel where the corner is dangerous, tarmac
+  // run-off everywhere else. The cheap approximation is a per-sample
+  // curvature lookup -- consecutive same-class samples become a single
+  // visual quad strip, so the colour change reads as a continuous patch
+  // rather than a checker pattern.
   const offset = 36;
   const outerRing = expandRing(track.outer, track.center, +offset);
   const innerRing = expandRing(track.inner, track.center, -offset);
 
-  ctx.fillStyle = "#c2a878";
-  ringFill(ctx, outerRing, track.outer);
-  ringFill(ctx, track.inner, innerRing);
-  void track; // satisfy lints
+  const GRAVEL_KAPPA = 0.012;   // tighter than this gets gravel
+  const gravel = "#c2a878";
+  const tarmac = "#3d4350";     // darker grey runoff for safer sections
+
+  const n = track.center.length;
+  // Outer side patches.
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const k = Math.max(Math.abs(track.curvature[i]), Math.abs(track.curvature[j]));
+    ctx.fillStyle = k > GRAVEL_KAPPA ? gravel : tarmac;
+    ctx.beginPath();
+    ctx.moveTo(track.outer[i].x, track.outer[i].y);
+    ctx.lineTo(track.outer[j].x, track.outer[j].y);
+    ctx.lineTo(outerRing[j].x, outerRing[j].y);
+    ctx.lineTo(outerRing[i].x, outerRing[i].y);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Inner side patches.
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const k = Math.max(Math.abs(track.curvature[i]), Math.abs(track.curvature[j]));
+    ctx.fillStyle = k > GRAVEL_KAPPA ? gravel : tarmac;
+    ctx.beginPath();
+    ctx.moveTo(track.inner[i].x, track.inner[i].y);
+    ctx.lineTo(track.inner[j].x, track.inner[j].y);
+    ctx.lineTo(innerRing[j].x, innerRing[j].y);
+    ctx.lineTo(innerRing[i].x, innerRing[i].y);
+    ctx.closePath();
+    ctx.fill();
+  }
 }
 
 function drawAsphalt(ctx: CanvasRenderingContext2D, track: Track) {
@@ -368,12 +399,6 @@ function expandRing(edge: Vec2[], center: Vec2[], offset: number): Vec2[] {
   return out;
 }
 
-function ringFill(ctx: CanvasRenderingContext2D, outer: Vec2[], inner: Vec2[]) {
-  ctx.beginPath();
-  polyPath(ctx, outer);
-  polyPath(ctx, [...inner].reverse());
-  ctx.fill("evenodd");
-}
 
 function polyPath(ctx: CanvasRenderingContext2D, pts: Vec2[]) {
   for (let i = 0; i < pts.length; i++) {

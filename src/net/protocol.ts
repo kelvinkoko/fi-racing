@@ -53,6 +53,7 @@ export type SnapshotCar = {
   d: 0 | 1;  // desloted flag
   w: 0 | 1;  // warning flag
   bl: 0 | 1; // blocked-by-traffic flag (drives switch-lane prompt)
+  br: 0 | 1; // braking flag (drives rear brake-light render)
   p: number; // progress around current lap, 0..1
 };
 

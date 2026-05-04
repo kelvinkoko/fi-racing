@@ -341,7 +341,8 @@ export default function Race({ net, onExit, timeTrial }: Props) {
         const r = renderPose(localCar, alpha);
         cars.push({
           pos: { x: r.x, y: r.y }, angle: r.angle, color: localCar.color,
-          isLocal: true, desloted: localCar.desloted, warning: localCar.warning
+          isLocal: true, desloted: localCar.desloted, warning: localCar.warning,
+          braking: localCar.braking
         });
       } else if (isHost && hostState) {
         for (const car of hostState.cars.values()) {
@@ -349,7 +350,8 @@ export default function Race({ net, onExit, timeTrial }: Props) {
           cars.push({
             pos: { x: r.x, y: r.y }, angle: r.angle, color: car.color,
             isLocal: car.id === net!.selfId,
-            desloted: car.desloted, warning: car.warning
+            desloted: car.desloted, warning: car.warning,
+            braking: car.braking
           });
         }
       } else if (clientView) {
@@ -359,7 +361,8 @@ export default function Race({ net, onExit, timeTrial }: Props) {
             pos: c.pos, angle: c.angle,
             color: info ? CAR_COLORS[info.colorIndex] : "#888",
             isLocal: id === net!.selfId,
-            desloted: c.desloted, warning: c.warning
+            desloted: c.desloted, warning: c.warning,
+            braking: c.braking
           });
         }
       }
@@ -613,7 +616,7 @@ export default function Race({ net, onExit, timeTrial }: Props) {
         </div>
         <div className="speed-bar">
           <div
-            className="speed-bar-fill"
+            className={"speed-bar-fill" + (hud.maxSafe > 0 && hud.speed > hud.maxSafe ? " over" : "")}
             style={{
               width: `${Math.min(100, (hud.speed / Math.max(hud.maxSafe, 1)) * 100)}%`,
               background: speedBarColor(hud)

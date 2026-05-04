@@ -71,6 +71,9 @@ export type Car = {
   // (any lane, including the same one). Slipstreaming temporarily
   // raises the speed cap so a trailing car gets a tow on the straight.
   slipstream: boolean;
+  // True while the player is actively braking — drives the rear-wing
+  // brake-light render in scene.ts.
+  braking: boolean;
   // Speed cap applied this tick because of a car ahead in the same lane.
   // Reset every tick by the traffic-resolution pass before stepCar runs.
   trafficCap: number;
@@ -108,6 +111,7 @@ export function createSlotCar(seed: {
     warning: false,
     blocked: false,
     slipstream: false,
+    braking: false,
     trafficCap: SLOT.topSpeed,
     input: emptyInput(),
   };
@@ -153,6 +157,7 @@ export function stepCar(car: Car, track: Track) {
   // ---- On-rails sim ----
 
   // Throttle / brake.
+  car.braking = input.brake > 0.05;
   let accel = SLOT.accel * input.throttle;
   if (input.brake > 0) accel -= SLOT.brake * input.brake;
   // Always-on rolling friction at low throttle.

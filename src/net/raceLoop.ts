@@ -179,6 +179,7 @@ export function buildSnapshot(state: HostState): SnapshotMsg {
       d: car.desloted ? 1 : 0,
       w: car.warning ? 1 : 0,
       bl: car.blocked ? 1 : 0,
+      br: car.braking ? 1 : 0,
       p: round(car.progress, 4)
     });
   }
@@ -233,6 +234,7 @@ export type ClientCarView = {
   desloted: boolean;
   warning: boolean;
   blocked: boolean;
+  braking: boolean;
   progress: number;
   targetPos?: { x: number; y: number };
   targetAngle?: number;
@@ -260,7 +262,8 @@ export function applySnapshot(view: ClientView, snap: SnapshotMsg) {
     if (!cur) {
       view.cars.set(c.id, {
         pos: { x: c.x, y: c.y }, angle: c.a, speed: c.v,
-        desloted: !!c.d, warning: !!c.w, blocked: !!c.bl, progress: c.p
+        desloted: !!c.d, warning: !!c.w, blocked: !!c.bl,
+        braking: !!c.br, progress: c.p
       });
     } else {
       cur.targetPos = { x: c.x, y: c.y };
@@ -269,6 +272,7 @@ export function applySnapshot(view: ClientView, snap: SnapshotMsg) {
       cur.desloted = !!c.d;
       cur.warning = !!c.w;
       cur.blocked = !!c.bl;
+      cur.braking = !!c.br;
       cur.progress = c.p;
     }
   }
