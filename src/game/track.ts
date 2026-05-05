@@ -57,27 +57,34 @@ const CONTROL_POINTS: Vec2[] = [
   { x: 820,  y: 0    },  // 19 turn-in onto the start straight
 ];
 
+export type LandmarkIcon =
+  | "station" | "canal" | "nakasu" | "tenjin" | "ohori"
+  | "castle"  | "dome"  | "tower"  | "beach"  | "bay";
+
 export type Landmark = {
   name: string;
+  /** Where the icon + label should be drawn (in green / sea area near
+   *  the track, hand-tuned for readability). */
   pos: Vec2;
-  // Where the label text should sit (offset from pos so it doesn't sit
-  // directly on the asphalt). Hand-tuned for readability.
-  label: Vec2;
+  /** Anchor point on the track that the connector line points to so
+   *  the player can tell which segment each spot belongs to. */
+  anchor: Vec2;
+  icon: LandmarkIcon;
 };
 
-// Famous Fukuoka spots with hand-tuned label offsets so each name lands
-// in the surrounding green / sea area, not on the track itself.
+// Famous Fukuoka spots. `anchor` is on/near the track, `pos` is where
+// the stylised icon + label sit so they don't cover the asphalt.
 export const LANDMARKS: Landmark[] = [
-  { name: "Hakata Stn",     pos: { x: 650,  y: 0    }, label: { x: 700,  y: 70   } },
-  { name: "Canal City",     pos: { x: 350,  y: 0    }, label: { x: 350,  y: 70   } },
-  { name: "Nakasu",         pos: { x: 200,  y: 0    }, label: { x: 200,  y: 70   } },
-  { name: "Tenjin",         pos: { x: 50,   y: 0    }, label: { x: 50,   y: 70   } },
-  { name: "Ohori Park",     pos: { x: -240, y: 60   }, label: { x: -240, y: -90  } },
-  { name: "Fukuoka Castle", pos: { x: -340, y: 150  }, label: { x: -340, y: 220  } },
-  { name: "PayPay Dome",    pos: { x: -620, y: -30  }, label: { x: -560, y: 60   } },
-  { name: "Fukuoka Tower",  pos: { x: -720, y: -160 }, label: { x: -820, y: -160 } },
-  { name: "Momochi Beach",  pos: { x: -660, y: -280 }, label: { x: -700, y: -380 } },
-  { name: "Hakata Bay",     pos: { x: -100, y: -340 }, label: { x: -100, y: -420 } },
+  { name: "Hakata Stn",     icon: "station", anchor: { x: 720,  y: 0    }, pos: { x: 760,  y: 100  } },
+  { name: "Canal City",     icon: "canal",   anchor: { x: 350,  y: 0    }, pos: { x: 350,  y: 110  } },
+  { name: "Nakasu",         icon: "nakasu",  anchor: { x: 200,  y: 0    }, pos: { x: 200,  y: 110  } },
+  { name: "Tenjin",         icon: "tenjin",  anchor: { x: 50,   y: 0    }, pos: { x: 50,   y: 130  } },
+  { name: "Ohori Park",     icon: "ohori",   anchor: { x: -240, y: 60   }, pos: { x: -180, y: -110 } },
+  { name: "Fukuoka Castle", icon: "castle",  anchor: { x: -340, y: 150  }, pos: { x: -380, y: 240  } },
+  { name: "PayPay Dome",    icon: "dome",    anchor: { x: -620, y: -30  }, pos: { x: -540, y: 120  } },
+  { name: "Fukuoka Tower",  icon: "tower",   anchor: { x: -720, y: -160 }, pos: { x: -870, y: -180 } },
+  { name: "Momochi Beach",  icon: "beach",   anchor: { x: -660, y: -280 }, pos: { x: -730, y: -430 } },
+  { name: "Hakata Bay",     icon: "bay",     anchor: { x: -100, y: -340 }, pos: { x: -100, y: -460 } },
 ];
 
 export function buildTrack(width = 60): Track {

@@ -1,5 +1,6 @@
 import { gridPositions, LANDMARKS, LANE_OFFSETS, Track } from "../game/track";
 import { perp, Vec2 } from "../game/spline";
+import { drawLandmarkIcon } from "./landmarkIcons";
 
 const MAX_GRID_SLOTS = 4;
 
@@ -306,47 +307,50 @@ function drawLaneStripes(ctx: CanvasRenderingContext2D, track: Track) {
   ctx.restore();
 }
 
-// Drop a small yellow pin at each Fukuoka landmark on the cached track
-// art and label it with the place name. Two-pass text (dark stroke
-// underneath, light fill on top) keeps every label readable whether it
-// lands on grass or sea.
+// Draw a stylised mini-illustration of each Fukuoka landmark in the
+// surrounding green / sea area, plus a thin connector to the relevant
+// stretch of track and a clean white-on-dark label. All baked into the
+// cached track-art canvas, so it costs nothing per frame.
 function drawLandmarks(ctx: CanvasRenderingContext2D) {
-  ctx.save();
-  ctx.font = "bold 13px ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
   for (const lm of LANDMARKS) {
-    // Pin dot.
+    // Connector line from the icon to the related point on the track.
+    ctx.strokeStyle = "rgba(255, 210, 64, 0.5)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(lm.pos.x, lm.pos.y);
+    ctx.lineTo(lm.anchor.x, lm.anchor.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Anchor pin on the track.
     ctx.fillStyle = "#ffd23f";
     ctx.beginPath();
-    ctx.arc(lm.pos.x, lm.pos.y, 4.5, 0, Math.PI * 2);
+    ctx.arc(lm.anchor.x, lm.anchor.y, 3.5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "rgba(11, 13, 18, 0.85)";
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(11,13,18,0.85)";
+    ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Connector line from pin to label (only if they aren't almost on top).
-    const dx = lm.label.x - lm.pos.x;
-    const dy = lm.label.y - lm.pos.y;
-    if (Math.hypot(dx, dy) > 30) {
-      ctx.strokeStyle = "rgba(255, 210, 64, 0.55)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(lm.pos.x, lm.pos.y);
-      ctx.lineTo(lm.label.x, lm.label.y);
-      ctx.stroke();
-    }
+    // Icon at landmark position.
+    ctx.save();
+    ctx.translate(lm.pos.x, lm.pos.y);
+    drawLandmarkIcon(ctx, lm.icon);
+    ctx.restore();
 
-    // Label text — dark outline first, then bright fill on top.
+    // Label below the icon.
+    ctx.save();
+    ctx.font = "bold 12px ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const labelY = lm.pos.y + 22;
     ctx.lineWidth = 3.2;
     ctx.strokeStyle = "rgba(11, 13, 18, 0.92)";
-    ctx.strokeText(lm.name, lm.label.x, lm.label.y);
+    ctx.strokeText(lm.name, lm.pos.x, labelY);
     ctx.fillStyle = "#f8fafd";
-    ctx.fillText(lm.name, lm.label.x, lm.label.y);
+    ctx.fillText(lm.name, lm.pos.x, labelY);
+    ctx.restore();
   }
-
-  ctx.restore();
 }
 
 // Paint white "[ ]" brackets at every grid slot so the grid is visible on
