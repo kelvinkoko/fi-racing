@@ -24,7 +24,16 @@ const BEST_LAP_KEY = "fi-racing.bestlap.circuit-alpha";
 const SNAPSHOT_HZ = 20;
 const INPUT_HZ = 30;
 
-type Props = { net?: NetRoom; onExit?: () => void; timeTrial?: boolean; totalLaps?: number };
+import { VoiceChat } from "../net/voice";
+import MicButton from "./MicButton";
+
+type Props = {
+  net?: NetRoom;
+  voice?: VoiceChat | null;
+  onExit?: () => void;
+  timeTrial?: boolean;
+  totalLaps?: number;
+};
 
 type HudData = {
   lap: number; totalLaps: number; curLap: number; lastLap: number | null;
@@ -53,7 +62,7 @@ type RankRow = {
   gap: string;
 };
 
-export default function Race({ net, onExit, timeTrial, totalLaps }: Props) {
+export default function Race({ net, voice, onExit, timeTrial, totalLaps }: Props) {
   const lapCount = timeTrial ? TIME_TRIAL_LAPS : (totalLaps ?? TOTAL_LAPS);
   const [savedBestLap, setSavedBestLap] = useState<number | null>(() => {
     const v = localStorage.getItem(BEST_LAP_KEY);
@@ -741,6 +750,9 @@ export default function Race({ net, onExit, timeTrial, totalLaps }: Props) {
       )}
       {onExit && (
         <button className="race-exit" onClick={onExit}>Exit</button>
+      )}
+      {voice && (
+        <MicButton voice={voice} className="race-mic" />
       )}
     </div>
   );

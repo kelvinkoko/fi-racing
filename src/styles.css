@@ -302,6 +302,46 @@ input[type="text"]:focus { border-color: var(--accent-2); }
 }
 .warn-text.dead { color: #ff445f; }
 
+.mic-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.mic-btn .mic-icon { font-size: 16px; line-height: 1; }
+.mic-btn .mic-label { font-size: 13px; }
+.mic-btn.mic-off  { color: var(--muted); }
+.mic-btn.mic-live {
+  background: linear-gradient(180deg, #2bd4ff, #0fa4cf);
+  border-color: #66e5ff;
+  color: #051a22;
+  box-shadow: 0 0 10px rgba(43, 212, 255, 0.5);
+}
+.mic-btn.mic-muted {
+  background: rgba(255, 68, 95, 0.18);
+  border-color: rgba(255, 68, 95, 0.55);
+  color: #ffb0bd;
+}
+
+.race-mic {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  z-index: 5;
+}
+@media (pointer: coarse) {
+  .race-mic {
+    top: 8px;
+    right: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: 999px;
+    opacity: 0.85;
+  }
+  .race-mic .mic-label { display: none; } /* icon only on mobile */
+}
+
 /* Race "Exit" button. Default sits at bottom-left where there's free
    space on desktop. On coarse-pointer (mobile) the bottom-left corner
    is occupied by the lane buttons, so the exit moves to the top-centre

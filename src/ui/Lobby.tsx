@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { NetRoom } from "../net/room";
+import { VoiceChat } from "../net/voice";
 import { CAR_COLORS, LobbyMsg } from "../net/protocol";
+import MicButton from "./MicButton";
 
 type Props = {
   net: NetRoom;
+  voice: VoiceChat | null;
   onStart: (totalLaps: number) => void;
   onLeave: () => void;
 };
@@ -18,7 +21,7 @@ function loadInitialLaps(): number {
   return LAP_OPTIONS.includes(n) ? n : 5;
 }
 
-export default function Lobby({ net, onStart, onLeave }: Props) {
+export default function Lobby({ net, voice, onStart, onLeave }: Props) {
   const [lobby, setLobby] = useState<LobbyMsg>(() => net.snapshotLobby());
   const [copied, setCopied] = useState(false);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
@@ -116,6 +119,7 @@ export default function Lobby({ net, onStart, onLeave }: Props) {
 
         <div className="row" style={{ marginTop: 16 }}>
           <button onClick={onLeave}>Leave</button>
+          <MicButton voice={voice} />
           <div className="spacer" />
           {isHost ? (
             <button className="primary" onClick={handleStart} disabled={lobby.players.length < 1}>

@@ -159,6 +159,17 @@ export class NetRoom {
   broadcastSnapshot(msg: SnapshotMsg) { this.sendSnapshot(msg); }
   sendChatMsg(msg: ChatMsg) { this.sendChat(msg); }
 
+  // ---- Media streaming pass-through (used by voice chat) ----
+  addStream(stream: MediaStream) {
+    this.room.addStream(stream);
+  }
+  removeStream(stream: MediaStream) {
+    this.room.removeStream(stream);
+  }
+  onPeerStream(fn: (stream: MediaStream, peerId: string) => void) {
+    this.room.onPeerStream(fn);
+  }
+
   leave() { this.room.leave(); }
 }
 
