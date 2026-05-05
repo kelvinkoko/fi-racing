@@ -5,7 +5,7 @@ import { buildMiniMapBackground, buildMiniMapProjection, drawMiniMap, MiniDot, M
 import { initEngineAudio, stopEngineAudio, updateEngineAudio } from "../render/engineAudio";
 import { Particles } from "../render/particles";
 import { createCamera, drawScene, followCamera, CarVisual } from "../render/scene";
-import { Car, createSlotCar, KMH_PER_PX_S, maxSafeSpeedFor, renderPose, stepCar } from "../game/car";
+import { Car, createSlotCar, KMH_PER_PX_S, maxSafeSpeedFor, renderPose, SLOT, stepCar } from "../game/car";
 import { Keyboard } from "../input/keyboard";
 import { TouchControls, isTouchDevice } from "../input/touch";
 import { SIM_DT } from "../game/constants";
@@ -362,7 +362,7 @@ export default function Race({ net, onExit, timeTrial, totalLaps }: Props) {
       // contributes nothing; at top it adds ~1 px of high-frequency
       // wobble — felt as engine rumble rather than seen.
       {
-        const ratio = Math.min(1, localSpeed / 470);
+        const ratio = Math.min(1, localSpeed / SLOT.topSpeed);
         if (ratio > 0.7) {
           const k = (ratio - 0.7) / 0.3;
           const amp = k * 1.1;
@@ -404,7 +404,7 @@ export default function Race({ net, onExit, timeTrial, totalLaps }: Props) {
       }
 
       // Engine audio for the local player.
-      updateEngineAudio(localSpeed / 470, localThrottle);
+      updateEngineAudio(localSpeed / SLOT.topSpeed, localThrottle);
 
       // Detect freshly-desloted cars and pop a spark burst at the impact.
       for (const c of cars) {
@@ -449,7 +449,7 @@ export default function Race({ net, onExit, timeTrial, totalLaps }: Props) {
       // backwards along its facing direction. Density scales linearly
       // with speed; colour shifts cool/blue at top speed for a "going
       // really fast" feel.
-      const TOP = 470;
+      const TOP = SLOT.topSpeed;
       for (const c of cars) {
         if (c.desloted) continue;
         // Need a speed value for the visual car. Approximate from

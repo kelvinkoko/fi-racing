@@ -10,23 +10,21 @@ export const SLOT = {
   // Acceleration / drag tuned so the car reaches ~90% of top speed in ~4s
   // (snappier than a real F1 to keep the arcade feel) but won't reach
   // hairpin speeds without braking.
-  accel: 220,
-  brake: 250,            // a touch of trail-braking — feather to slow,
-                         // release to roll. A full pedal still gets you
-                         // down to hairpin speed, just not in an instant.
+  accel: 300,
+  brake: 330,            // softer brakes to encourage feathering / trail-braking
   drag: 0.40,
   rollingFriction: 35,
-  topSpeed: 470,         // ≈ 338 km/h (PX_PER_METER = 5)
+  topSpeed: 620,         // ≈ 446 km/h — straight-line motion is visibly faster
   slipstreamBonus: 0.10, // +10 % top speed while drafting a car ahead
-  // Lateral acceleration ceiling. Real F1 peaks near 5g; we sit a bit
-  // above that for arcade forgiveness so a slight overshoot through a
-  // corner doesn't immediately fling you off — only genuinely too fast
-  // attempts deslot.
-  maxCentripetal: 1200,
-  warnRatio: 0.6,        // CORNER! warning fires earlier, more reaction time
+  // Lateral acceleration ceiling. Scaled up with topSpeed² so corner
+  // safe-speeds stay in the same proportion (still need to brake from
+  // top speed for tight stuff, still get the +30 % outer-lane grip on
+  // top of geometry).
+  maxCentripetal: 2100,
+  warnRatio: 0.6,
   laneSwitchRate: 1.4,
   deslotDuration: 2.4,
-  respawnSpeed: 50,
+  respawnSpeed: 65,
 };
 
 // 1 sim pixel ≈ 0.2 metres (5 px per metre). Lets the HUD show speeds in
