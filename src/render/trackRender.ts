@@ -1,4 +1,4 @@
-import { gridPositions, LANE_OFFSETS, Track } from "../game/track";
+import { gridPositions, LANDMARKS, LANE_OFFSETS, Track } from "../game/track";
 import { perp, Vec2 } from "../game/spline";
 
 const MAX_GRID_SLOTS = 4;
@@ -32,6 +32,7 @@ export function renderTrackArt(track: Track, scale = 1): TrackArt {
   drawLaneStripes(ctx, track);
   drawStartLine(ctx, track);
   drawStartGrid(ctx, track);
+  drawLandmarks(ctx);
 
   const worldToArt = (x: number, y: number): Vec2 => ({
     x: (x - track.bounds.minX + padding) * scale,
@@ -302,6 +303,49 @@ function drawLaneStripes(ctx: CanvasRenderingContext2D, track: Track) {
     ctx.stroke();
   }
   ctx.setLineDash([]);
+  ctx.restore();
+}
+
+// Drop a small yellow pin at each Fukuoka landmark on the cached track
+// art and label it with the place name. Two-pass text (dark stroke
+// underneath, light fill on top) keeps every label readable whether it
+// lands on grass or sea.
+function drawLandmarks(ctx: CanvasRenderingContext2D) {
+  ctx.save();
+  ctx.font = "bold 13px ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (const lm of LANDMARKS) {
+    // Pin dot.
+    ctx.fillStyle = "#ffd23f";
+    ctx.beginPath();
+    ctx.arc(lm.pos.x, lm.pos.y, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(11, 13, 18, 0.85)";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Connector line from pin to label (only if they aren't almost on top).
+    const dx = lm.label.x - lm.pos.x;
+    const dy = lm.label.y - lm.pos.y;
+    if (Math.hypot(dx, dy) > 30) {
+      ctx.strokeStyle = "rgba(255, 210, 64, 0.55)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(lm.pos.x, lm.pos.y);
+      ctx.lineTo(lm.label.x, lm.label.y);
+      ctx.stroke();
+    }
+
+    // Label text — dark outline first, then bright fill on top.
+    ctx.lineWidth = 3.2;
+    ctx.strokeStyle = "rgba(11, 13, 18, 0.92)";
+    ctx.strokeText(lm.name, lm.label.x, lm.label.y);
+    ctx.fillStyle = "#f8fafd";
+    ctx.fillText(lm.name, lm.label.x, lm.label.y);
+  }
+
   ctx.restore();
 }
 

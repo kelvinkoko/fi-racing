@@ -19,31 +19,65 @@ export type Track = {
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
 };
 
-// F1-style fictional layout. Hand-tuned control points form a flowing circuit:
-// long start straight, fast right kink, S-chicane, hairpin, sweeping double-apex,
-// returning down a back straight to the start.
+// Fukuoka city-tour layout. Clockwise loop visiting the famous landmarks
+// roughly in their real geographic order:
+//   south side  (Hakata → Canal City → Nakasu → Tenjin) — long start
+//                straight along the city's east-west main road
+//   south-west  (Ohori Park → Fukuoka Castle ruins detour)
+//   far west    (PayPay Dome → Fukuoka Tower)
+//   north side  (Momochi Beach → Hakata Bay coast — the back stretch)
+//   east return turn-in to the Hakata Station start straight
+//
+// Y is screen-down so "north" (the bay) is at NEGATIVE y, matching how
+// real maps print Fukuoka with the bay at the top of the page.
 const CONTROL_POINTS: Vec2[] = [
-  { x: 0,    y: 0    }, // start/finish
-  { x: 600,  y: -20  },
-  { x: 950,  y: -120 }, // fast right kink
-  { x: 1200, y: -340 },
-  { x: 1320, y: -640 },
-  { x: 1180, y: -880 }, // entry to chicane
-  { x: 980,  y: -820 }, // chicane apex 1
-  { x: 880,  y: -640 }, // chicane apex 2
-  { x: 720,  y: -560 },
-  { x: 500,  y: -700 },
-  { x: 280,  y: -940 }, // approach hairpin
-  { x: 120,  y: -1080 },
-  { x: -120, y: -1060 }, // hairpin apex
-  { x: -260, y: -880 },
-  { x: -200, y: -640 }, // sweeping double-apex entry
-  { x: -380, y: -440 },
-  { x: -560, y: -300 },
-  { x: -680, y: -120 },
-  { x: -640, y: 80   },
-  { x: -440, y: 160  },
-  { x: -200, y: 120  },
+  // Start straight along Hakata–Tenjin (samples 0..3 are on y=0).
+  { x: 650,  y: 0    },  // 0  HAKATA STATION — start / finish
+  { x: 500,  y: 0    },  // 1
+  { x: 350,  y: 0    },  // 2  CANAL CITY
+  { x: 200,  y: 0    },  // 3  NAKASU
+  { x: 50,   y: 0    },  // 4  TENJIN
+  // South dip down to the Castle ruins, then back north.
+  { x: -100, y: 30   },  // 5  Akasaka
+  { x: -240, y: 60   },  // 6  OHORI PARK
+  { x: -340, y: 150  },  // 7  FUKUOKA CASTLE (south detour)
+  { x: -500, y: 90   },  // 8
+  // West / north-west to the coast.
+  { x: -620, y: -30  },  // 9  PAYPAY DOME
+  { x: -720, y: -160 },  // 10 FUKUOKA TOWER (far-west extreme)
+  { x: -660, y: -280 },  // 11 MOMOCHI BEACH (turn east onto bay)
+  // Bay-coast back stretch heading east.
+  { x: -460, y: -320 },  // 12
+  { x: -200, y: -340 },  // 13 HAKATA BAY
+  { x: 50,   y: -340 },  // 14
+  { x: 280,  y: -320 },  // 15
+  { x: 480,  y: -250 },  // 16
+  { x: 640,  y: -140 },  // 17
+  { x: 780,  y: -60  },  // 18
+  { x: 820,  y: 0    },  // 19 turn-in onto the start straight
+];
+
+export type Landmark = {
+  name: string;
+  pos: Vec2;
+  // Where the label text should sit (offset from pos so it doesn't sit
+  // directly on the asphalt). Hand-tuned for readability.
+  label: Vec2;
+};
+
+// Famous Fukuoka spots with hand-tuned label offsets so each name lands
+// in the surrounding green / sea area, not on the track itself.
+export const LANDMARKS: Landmark[] = [
+  { name: "Hakata Stn",     pos: { x: 650,  y: 0    }, label: { x: 700,  y: 70   } },
+  { name: "Canal City",     pos: { x: 350,  y: 0    }, label: { x: 350,  y: 70   } },
+  { name: "Nakasu",         pos: { x: 200,  y: 0    }, label: { x: 200,  y: 70   } },
+  { name: "Tenjin",         pos: { x: 50,   y: 0    }, label: { x: 50,   y: 70   } },
+  { name: "Ohori Park",     pos: { x: -240, y: 60   }, label: { x: -240, y: -90  } },
+  { name: "Fukuoka Castle", pos: { x: -340, y: 150  }, label: { x: -340, y: 220  } },
+  { name: "PayPay Dome",    pos: { x: -620, y: -30  }, label: { x: -560, y: 60   } },
+  { name: "Fukuoka Tower",  pos: { x: -720, y: -160 }, label: { x: -820, y: -160 } },
+  { name: "Momochi Beach",  pos: { x: -660, y: -280 }, label: { x: -700, y: -380 } },
+  { name: "Hakata Bay",     pos: { x: -100, y: -340 }, label: { x: -100, y: -420 } },
 ];
 
 export function buildTrack(width = 60): Track {
@@ -88,7 +122,7 @@ export function buildTrack(width = 60): Track {
   }
 
   return {
-    name: "Circuit Alpha",
+    name: "Fukuoka Street Circuit",
     width,
     center,
     tangents,
