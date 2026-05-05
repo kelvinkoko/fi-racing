@@ -14,7 +14,7 @@ export const SLOT = {
   brake: 330,            // softer brakes to encourage feathering / trail-braking
   drag: 0.40,
   rollingFriction: 35,
-  topSpeed: 620,         // ≈ 446 km/h — straight-line motion is visibly faster
+  topSpeed: 620,         // ≈ 341 km/h (PX_PER_METER = 6.55)
   slipstreamBonus: 0.10, // +10 % top speed while drafting a car ahead
   // Lateral acceleration ceiling. Scaled up with topSpeed² so corner
   // safe-speeds stay in the same proportion (still need to brake from
@@ -27,10 +27,11 @@ export const SLOT = {
   respawnSpeed: 65,
 };
 
-// 1 sim pixel ≈ 0.2 metres (5 px per metre). Lets the HUD show speeds in
-// km/h that map roughly onto F1-scale numbers.
-export const PX_PER_METER = 5;
-export const KMH_PER_PX_S = 3.6 / PX_PER_METER; // 0.72
+// World scale chosen so SLOT.topSpeed (620 px/s) maps to ~341 km/h —
+// inside the realistic F1 envelope (typical race max 320–340 km/h, all-
+// time records around 380). One sim pixel ≈ 0.153 m (≈ 6.55 px / m).
+export const PX_PER_METER = 6.55;
+export const KMH_PER_PX_S = 3.6 / PX_PER_METER; // ≈ 0.55
 
 export type CarInput = {
   throttle: number; // 0..1
