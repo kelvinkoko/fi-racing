@@ -314,11 +314,14 @@ export default function Race({ net, voice, onExit, timeTrial, totalLaps }: Props
           acc = r.acc;
           const myLap = hostState.laps.get(net!.selfId);
           if (myLap) syncLocalLap(myLap);
-          if (now - lastSnapSent >= 1000 / SNAPSHOT_HZ) {
-            net!.broadcastSnapshot(buildSnapshot(hostState));
-            lastSnapSent = now;
-          }
           if (hostState.raceOver) finishRace();
+        }
+        // Broadcast snapshots even during countdown so client peers see
+        // the starting grid sitting on the track before lights-out
+        // instead of an empty screen.
+        if (now - lastSnapSent >= 1000 / SNAPSHOT_HZ) {
+          net!.broadcastSnapshot(buildSnapshot(hostState));
+          lastSnapSent = now;
         }
       } else if (clientView) {
         if (started && now - lastInputSent >= 1000 / INPUT_HZ) {
