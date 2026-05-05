@@ -76,19 +76,29 @@ export type Landmark = {
   icon: LandmarkIcon;
 };
 
-// Famous Fukuoka spots. `anchor` is on/near the track, `pos` is where
-// the stylised icon + label sit so they don't cover the asphalt.
+// Famous Fukuoka spots, positioned in the surrounding world so the
+// track passes by them like real city scenery. `anchor` stays for any
+// future use (mini-map etc.), `pos` is the world-space spot where the
+// building silhouette is rendered into the cached track art.
 export const LANDMARKS: Landmark[] = [
-  { name: "Hakata Stn",     icon: "station", anchor: { x: 530,  y: 0    }, pos: { x: 580,  y: 110  } },
-  { name: "Canal City",     icon: "canal",   anchor: { x: 380,  y: 0    }, pos: { x: 380,  y: 110  } },
-  { name: "Nakasu",         icon: "nakasu",  anchor: { x: 220,  y: 0    }, pos: { x: 220,  y: 110  } },
-  { name: "Tenjin",         icon: "tenjin",  anchor: { x: 60,   y: 0    }, pos: { x: 60,   y: 130  } },
-  { name: "Ohori Park",     icon: "ohori",   anchor: { x: -240, y: 70   }, pos: { x: -180, y: -110 } },
-  { name: "Fukuoka Castle", icon: "castle",  anchor: { x: -360, y: 170  }, pos: { x: -400, y: 260  } },
+  // South-side city scenery: cars run west along the start straight
+  // with this row of buildings on their left.
+  { name: "Hakata Stn",     icon: "station", anchor: { x: 530,  y: 0    }, pos: { x: 530,  y: 160  } },
+  { name: "Canal City",     icon: "canal",   anchor: { x: 380,  y: 0    }, pos: { x: 380,  y: 160  } },
+  { name: "Nakasu",         icon: "nakasu",  anchor: { x: 220,  y: 0    }, pos: { x: 220,  y: 160  } },
+  { name: "Tenjin",         icon: "tenjin",  anchor: { x: 60,   y: 0    }, pos: { x: 60,   y: 160  } },
+  // South detour: park sits inside the loop, castle sits south of the
+  // detour apex like the real Maizuru Park location.
+  { name: "Ohori Park",     icon: "ohori",   anchor: { x: -240, y: 70   }, pos: { x: -160, y: -130 } },
+  { name: "Fukuoka Castle", icon: "castle",  anchor: { x: -360, y: 170  }, pos: { x: -360, y: 290  } },
+  // West side: dome sits inland of the corner, tower sits past the
+  // coast at the western extreme.
   { name: "PayPay Dome",    icon: "dome",    anchor: { x: -640, y: -10  }, pos: { x: -560, y: 130  } },
-  { name: "Fukuoka Tower",  icon: "tower",   anchor: { x: -740, y: -150 }, pos: { x: -890, y: -170 } },
-  { name: "Momochi Beach",  icon: "beach",   anchor: { x: -680, y: -290 }, pos: { x: -740, y: -440 } },
-  { name: "Hakata Bay",     icon: "bay",     anchor: { x: -100, y: -360 }, pos: { x: -100, y: -470 } },
+  { name: "Fukuoka Tower",  icon: "tower",   anchor: { x: -740, y: -150 }, pos: { x: -880, y: -150 } },
+  // North side (sea): beach + bay scenery sits north of the back
+  // stretch.
+  { name: "Momochi Beach",  icon: "beach",   anchor: { x: -680, y: -290 }, pos: { x: -780, y: -460 } },
+  { name: "Hakata Bay",     icon: "bay",     anchor: { x: -100, y: -360 }, pos: { x: -100, y: -490 } },
 ];
 
 export function buildTrack(width = 60): Track {

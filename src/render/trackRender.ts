@@ -168,14 +168,22 @@ function drawCurbs(ctx: CanvasRenderingContext2D, track: Track) {
     curvature[i] = a.x * b.y - a.y * b.x;
   }
 
+  // Cap the maximum curb length to keep tight corners from looking like
+  // the curb wraps the whole apex zone — F1 curbs are typically short
+  // strips focused on the apex itself.
+  const MAX_CURB_SAMPLES = 14;
+
   let i = 0;
   let segId = 0;
   while (i < samples) {
     const c = curvature[i];
-    if (Math.abs(c) > 0.18) {
+    if (Math.abs(c) > 0.22) {
       const sign = Math.sign(c);
       let j = i;
-      while (j < samples && Math.sign(curvature[j]) === sign && Math.abs(curvature[j]) > 0.08) j++;
+      while (j < samples
+        && (j - i) < MAX_CURB_SAMPLES
+        && Math.sign(curvature[j]) === sign
+        && Math.abs(curvature[j]) > 0.12) j++;
       drawCurbSegment(ctx, track, i, j, sign, segId++);
       i = j;
     } else {
@@ -307,48 +315,17 @@ function drawLaneStripes(ctx: CanvasRenderingContext2D, track: Track) {
   ctx.restore();
 }
 
-// Draw a stylised mini-illustration of each Fukuoka landmark in the
-// surrounding green / sea area, plus a thin connector to the relevant
-// stretch of track and a clean white-on-dark label. All baked into the
-// cached track-art canvas, so it costs nothing per frame.
+// Draw the actual landmark buildings into the cached track art so they
+// sit in the world like real city scenery — the track passes by them,
+// no labels and no connector lines, the silhouette has to read on its
+// own.
 function drawLandmarks(ctx: CanvasRenderingContext2D) {
+  const SCALE = 1.8;
   for (const lm of LANDMARKS) {
-    // Connector line from the icon to the related point on the track.
-    ctx.strokeStyle = "rgba(255, 210, 64, 0.5)";
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 4]);
-    ctx.beginPath();
-    ctx.moveTo(lm.pos.x, lm.pos.y);
-    ctx.lineTo(lm.anchor.x, lm.anchor.y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Anchor pin on the track.
-    ctx.fillStyle = "#ffd23f";
-    ctx.beginPath();
-    ctx.arc(lm.anchor.x, lm.anchor.y, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(11,13,18,0.85)";
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // Icon at landmark position.
     ctx.save();
     ctx.translate(lm.pos.x, lm.pos.y);
+    ctx.scale(SCALE, SCALE);
     drawLandmarkIcon(ctx, lm.icon);
-    ctx.restore();
-
-    // Label below the icon.
-    ctx.save();
-    ctx.font = "bold 12px ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    const labelY = lm.pos.y + 22;
-    ctx.lineWidth = 3.2;
-    ctx.strokeStyle = "rgba(11, 13, 18, 0.92)";
-    ctx.strokeText(lm.name, lm.pos.x, labelY);
-    ctx.fillStyle = "#f8fafd";
-    ctx.fillText(lm.name, lm.pos.x, labelY);
     ctx.restore();
   }
 }
