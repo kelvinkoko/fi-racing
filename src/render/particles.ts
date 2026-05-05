@@ -18,6 +18,10 @@ export class Particles {
 
   count() { return this.list.length; }
 
+  spawn(p: Particle) {
+    this.list.push(p);
+  }
+
   spawnBurst(x: number, y: number, count: number, opts?: {
     speedMin?: number; speedMax?: number;
     lifeMin?: number; lifeMax?: number;

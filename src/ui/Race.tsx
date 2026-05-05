@@ -340,6 +340,37 @@ export default function Race({ net, onExit, timeTrial, totalLaps }: Props) {
       }
       followCamera(cam, camTarget, canvas.clientWidth, canvas.clientHeight, dt);
 
+      // Resolve the local player's speed and throttle (used by the camera
+      // shake below, the dust trail emitter, and the engine audio).
+      const localSpeed = (() => {
+        if (isMultiplayer && isHost && hostState) {
+          return hostState.cars.get(net!.selfId)?.speed ?? 0;
+        }
+        if (isMultiplayer && clientView) {
+          return clientView.cars.get(net!.selfId)?.speed ?? 0;
+        }
+        return localCar.speed;
+      })();
+      const localThrottle = (() => {
+        if (!isMultiplayer) return localCar.input.throttle;
+        const me = isHost && hostState ? hostState.inputs.get(net!.selfId) : null;
+        return me ? me.throttle : 0;
+      })();
+
+      // Speed-based camera shake (sub-pixel jitter that scales with how
+      // close to top speed the local player is). Below 70 % of top it
+      // contributes nothing; at top it adds ~1 px of high-frequency
+      // wobble — felt as engine rumble rather than seen.
+      {
+        const ratio = Math.min(1, localSpeed / 470);
+        if (ratio > 0.7) {
+          const k = (ratio - 0.7) / 0.3;
+          const amp = k * 1.1;
+          cam.x += (Math.random() - 0.5) * amp;
+          cam.y += (Math.random() - 0.5) * amp;
+        }
+      }
+
       // Build car visuals.
       const cars: CarVisual[] = [];
       if (!isMultiplayer) {
@@ -373,20 +404,6 @@ export default function Race({ net, onExit, timeTrial, totalLaps }: Props) {
       }
 
       // Engine audio for the local player.
-      const localSpeed = (() => {
-        if (isMultiplayer && isHost && hostState) {
-          return hostState.cars.get(net!.selfId)?.speed ?? 0;
-        }
-        if (isMultiplayer && clientView) {
-          return clientView.cars.get(net!.selfId)?.speed ?? 0;
-        }
-        return localCar.speed;
-      })();
-      const localThrottle = (() => {
-        if (!isMultiplayer) return localCar.input.throttle;
-        const me = isHost && hostState ? hostState.inputs.get(net!.selfId) : null;
-        return me ? me.throttle : 0;
-      })();
       updateEngineAudio(localSpeed / 470, localThrottle);
 
       // Detect freshly-desloted cars and pop a spark burst at the impact.
@@ -426,6 +443,57 @@ export default function Race({ net, onExit, timeTrial, totalLaps }: Props) {
       for (const id of [...prevDeslotState.keys()]) {
         if (!seenIds.includes(id)) prevDeslotState.delete(id);
       }
+
+      // High-speed dust trail. For each car going faster than ~50 % of
+      // top speed, emit a thin trail of small particles streaming
+      // backwards along its facing direction. Density scales linearly
+      // with speed; colour shifts cool/blue at top speed for a "going
+      // really fast" feel.
+      const TOP = 470;
+      for (const c of cars) {
+        if (c.desloted) continue;
+        // Need a speed value for the visual car. Approximate from
+        // authoritative state for accuracy.
+        let s = 0;
+        if (!isMultiplayer) s = localCar.speed;
+        else if (isHost && hostState) {
+          // Match by reference position — host has direct access.
+          for (const car of hostState.cars.values()) {
+            if (Math.hypot(car.pos.x - c.pos.x, car.pos.y - c.pos.y) < 1) { s = car.speed; break; }
+          }
+        } else if (clientView) {
+          for (const cv of clientView.cars.values()) {
+            if (Math.hypot(cv.pos.x - c.pos.x, cv.pos.y - c.pos.y) < 1) { s = cv.speed; break; }
+          }
+        }
+        const ratio = Math.min(1, s / TOP);
+        if (ratio < 0.5) continue;
+        const rate = (ratio - 0.5) * 80;          // 0–40 particles/sec
+        const expected = rate * dt;
+        const count = Math.floor(expected) + (Math.random() < (expected % 1) ? 1 : 0);
+        if (count <= 0) continue;
+        const fx = -Math.cos(c.angle);            // backward in car frame
+        const fy = -Math.sin(c.angle);
+        const sideX = -Math.sin(c.angle);
+        const sideY =  Math.cos(c.angle);
+        const cool = ratio > 0.85;
+        for (let i = 0; i < count; i++) {
+          const side = (Math.random() - 0.5) * 14;
+          const back = 14 + Math.random() * 4;
+          const speed = 60 + Math.random() * (90 + ratio * 80);
+          const life = 0.18 + Math.random() * 0.24;
+          particles.spawn({
+            x: c.pos.x + fx * back + sideX * side,
+            y: c.pos.y + fy * back + sideY * side,
+            vx: fx * speed + sideX * side * 0.6,
+            vy: fy * speed + sideY * side * 0.6,
+            life, maxLife: life,
+            size: 1 + Math.random() * 0.8,
+            color: cool ? "rgba(150,190,225,0.55)" : "rgba(170,170,180,0.45)"
+          });
+        }
+      }
+
       particles.update(dt);
 
       drawScene(ctx, cam, track, art, cars, canvas.clientWidth, canvas.clientHeight, particles);
