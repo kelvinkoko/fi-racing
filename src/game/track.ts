@@ -31,30 +31,34 @@ export type Track = {
 // Y is screen-down so "north" (the bay) is at NEGATIVE y, matching how
 // real maps print Fukuoka with the bay at the top of the page.
 const CONTROL_POINTS: Vec2[] = [
-  // Start straight along Hakata–Tenjin (samples 0..3 are on y=0).
-  { x: 650,  y: 0    },  // 0  HAKATA STATION — start / finish
-  { x: 500,  y: 0    },  // 1
-  { x: 350,  y: 0    },  // 2  CANAL CITY
-  { x: 200,  y: 0    },  // 3  NAKASU
-  { x: 50,   y: 0    },  // 4  TENJIN
+  // Start straight along Hakata–Tenjin (samples 0..3 colinear on y=0).
+  // Three points on y=0 ahead of the start guarantee a pure-west tangent
+  // through the whole grid section.
+  { x: 530,  y: 0    },  // 0  HAKATA STATION — start / finish
+  { x: 380,  y: 0    },  // 1
+  { x: 220,  y: 0    },  // 2  Canal City run
+  { x: 60,   y: 0    },  // 3  Nakasu / Tenjin run
   // South dip down to the Castle ruins, then back north.
-  { x: -100, y: 30   },  // 5  Akasaka
-  { x: -240, y: 60   },  // 6  OHORI PARK
-  { x: -340, y: 150  },  // 7  FUKUOKA CASTLE (south detour)
-  { x: -500, y: 90   },  // 8
+  { x: -100, y: 30   },  // 4  Akasaka
+  { x: -240, y: 70   },  // 5  Ohori area
+  { x: -360, y: 170  },  // 6  FUKUOKA CASTLE (south detour apex)
+  { x: -520, y: 110  },  // 7
   // West / north-west to the coast.
-  { x: -620, y: -30  },  // 9  PAYPAY DOME
-  { x: -720, y: -160 },  // 10 FUKUOKA TOWER (far-west extreme)
-  { x: -660, y: -280 },  // 11 MOMOCHI BEACH (turn east onto bay)
+  { x: -640, y: -10  },  // 8  PayPay Dome run
+  { x: -740, y: -150 },  // 9  Fukuoka Tower (far-west extreme)
+  { x: -680, y: -290 },  // 10 Momochi Beach (turn east onto bay)
   // Bay-coast back stretch heading east.
-  { x: -460, y: -320 },  // 12
-  { x: -200, y: -340 },  // 13 HAKATA BAY
-  { x: 50,   y: -340 },  // 14
-  { x: 280,  y: -320 },  // 15
-  { x: 480,  y: -250 },  // 16
-  { x: 640,  y: -140 },  // 17
-  { x: 780,  y: -60  },  // 18
-  { x: 820,  y: 0    },  // 19 turn-in onto the start straight
+  { x: -480, y: -340 },  // 11
+  { x: -200, y: -360 },  // 12 Hakata Bay
+  { x: 60,   y: -360 },  // 13
+  { x: 320,  y: -340 },  // 14
+  { x: 520,  y: -270 },  // 15
+  // East-end hairpin: cars come in heading ESE, pivot south, then exit
+  // pointing west — onto the start straight without overshoot.
+  { x: 700,  y: -150 },  // 16 corner entry
+  { x: 800,  y: -40  },  // 17 corner apex (off-straight)
+  { x: 760,  y: 0    },  // 18 corner exit, just touching y=0
+  { x: 650,  y: 0    },  // 19 first colinear point on the start straight
 ];
 
 export type LandmarkIcon =
@@ -75,16 +79,16 @@ export type Landmark = {
 // Famous Fukuoka spots. `anchor` is on/near the track, `pos` is where
 // the stylised icon + label sit so they don't cover the asphalt.
 export const LANDMARKS: Landmark[] = [
-  { name: "Hakata Stn",     icon: "station", anchor: { x: 720,  y: 0    }, pos: { x: 760,  y: 100  } },
-  { name: "Canal City",     icon: "canal",   anchor: { x: 350,  y: 0    }, pos: { x: 350,  y: 110  } },
-  { name: "Nakasu",         icon: "nakasu",  anchor: { x: 200,  y: 0    }, pos: { x: 200,  y: 110  } },
-  { name: "Tenjin",         icon: "tenjin",  anchor: { x: 50,   y: 0    }, pos: { x: 50,   y: 130  } },
-  { name: "Ohori Park",     icon: "ohori",   anchor: { x: -240, y: 60   }, pos: { x: -180, y: -110 } },
-  { name: "Fukuoka Castle", icon: "castle",  anchor: { x: -340, y: 150  }, pos: { x: -380, y: 240  } },
-  { name: "PayPay Dome",    icon: "dome",    anchor: { x: -620, y: -30  }, pos: { x: -540, y: 120  } },
-  { name: "Fukuoka Tower",  icon: "tower",   anchor: { x: -720, y: -160 }, pos: { x: -870, y: -180 } },
-  { name: "Momochi Beach",  icon: "beach",   anchor: { x: -660, y: -280 }, pos: { x: -730, y: -430 } },
-  { name: "Hakata Bay",     icon: "bay",     anchor: { x: -100, y: -340 }, pos: { x: -100, y: -460 } },
+  { name: "Hakata Stn",     icon: "station", anchor: { x: 530,  y: 0    }, pos: { x: 580,  y: 110  } },
+  { name: "Canal City",     icon: "canal",   anchor: { x: 380,  y: 0    }, pos: { x: 380,  y: 110  } },
+  { name: "Nakasu",         icon: "nakasu",  anchor: { x: 220,  y: 0    }, pos: { x: 220,  y: 110  } },
+  { name: "Tenjin",         icon: "tenjin",  anchor: { x: 60,   y: 0    }, pos: { x: 60,   y: 130  } },
+  { name: "Ohori Park",     icon: "ohori",   anchor: { x: -240, y: 70   }, pos: { x: -180, y: -110 } },
+  { name: "Fukuoka Castle", icon: "castle",  anchor: { x: -360, y: 170  }, pos: { x: -400, y: 260  } },
+  { name: "PayPay Dome",    icon: "dome",    anchor: { x: -640, y: -10  }, pos: { x: -560, y: 130  } },
+  { name: "Fukuoka Tower",  icon: "tower",   anchor: { x: -740, y: -150 }, pos: { x: -890, y: -170 } },
+  { name: "Momochi Beach",  icon: "beach",   anchor: { x: -680, y: -290 }, pos: { x: -740, y: -440 } },
+  { name: "Hakata Bay",     icon: "bay",     anchor: { x: -100, y: -360 }, pos: { x: -100, y: -470 } },
 ];
 
 export function buildTrack(width = 60): Track {
