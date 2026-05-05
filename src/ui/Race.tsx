@@ -740,12 +740,7 @@ export default function Race({ net, onExit, timeTrial, totalLaps }: Props) {
         </div>
       )}
       {onExit && (
-        <button
-          style={{ position: "absolute", bottom: 16, left: 16 }}
-          onClick={onExit}
-        >
-          Exit
-        </button>
+        <button className="race-exit" onClick={onExit}>Exit</button>
       )}
     </div>
   );
