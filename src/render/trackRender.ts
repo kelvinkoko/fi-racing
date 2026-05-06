@@ -26,9 +26,10 @@ export function renderTrackArt(track: Track, scale = 1): TrackArt {
   ctx.scale(scale, scale);
   ctx.translate(-track.bounds.minX + padding, -track.bounds.minY + padding);
 
-  drawGrass(ctx, track, padding);
+  drawTabletop(ctx, track, padding);
   drawRunoff(ctx, track);
   drawAsphalt(ctx, track);
+  drawTrackSeams(ctx, track);
   drawCurbs(ctx, track);
   drawLaneStripes(ctx, track);
   drawStartLine(ctx, track);
@@ -53,21 +54,98 @@ export function renderTrackArt(track: Track, scale = 1): TrackArt {
   };
 }
 
-function drawGrass(ctx: CanvasRenderingContext2D, track: Track, padding: number) {
+// Dark walnut tabletop. Sets the "model on a table" mood — the track is
+// a moulded plastic piece sitting on a wooden surface rather than a real
+// circuit set in grass.
+function drawTabletop(ctx: CanvasRenderingContext2D, track: Track, padding: number) {
   const { minX, minY, maxX, maxY } = track.bounds;
-  const grad = ctx.createLinearGradient(minX, minY, maxX, maxY);
-  grad.addColorStop(0, "#1f3b22");
-  grad.addColorStop(1, "#16291a");
-  ctx.fillStyle = grad;
-  ctx.fillRect(minX - padding, minY - padding, (maxX - minX) + padding * 2, (maxY - minY) + padding * 2);
+  const w = (maxX - minX) + padding * 2;
+  const h = (maxY - minY) + padding * 2;
+  const x0 = minX - padding;
+  const y0 = minY - padding;
 
-  // Subtle stripe pattern for that mowed-grass feel.
+  // Base wood with a soft top-left → bottom-right gradient.
+  const grad = ctx.createLinearGradient(x0, y0, x0 + w, y0 + h);
+  grad.addColorStop(0,    "#3a2716");
+  grad.addColorStop(0.5,  "#2a1d10");
+  grad.addColorStop(1,    "#190f06");
+  ctx.fillStyle = grad;
+  ctx.fillRect(x0, y0, w, h);
+
+  // Plank seams — three or four wide horizontal planks across the table.
   ctx.save();
-  ctx.globalAlpha = 0.06;
-  ctx.fillStyle = "#0a1a0d";
-  const stripe = 18;
-  for (let y = minY - padding; y < maxY + padding; y += stripe * 2) {
-    ctx.fillRect(minX - padding, y, (maxX - minX) + padding * 2, stripe);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+  const plankH = 280;
+  for (let y = y0; y < y0 + h; y += plankH) {
+    ctx.fillRect(x0, y, w, 1.6);
+  }
+
+  // Long thin grain lines, varied opacity + length so it doesn't look
+  // like wallpaper.
+  for (let i = 0; i < Math.floor(h / 3); i++) {
+    const y = y0 + Math.random() * h;
+    const startX = x0 + Math.random() * w * 0.4;
+    const endX   = startX + 60 + Math.random() * 220;
+    const op = 0.04 + Math.random() * 0.08;
+    ctx.fillStyle = `rgba(120, 80, 40, ${op})`;
+    ctx.fillRect(startX, y, Math.min(endX, x0 + w) - startX, 0.8);
+  }
+
+  // Knots — small dark elliptical patches.
+  for (let i = 0; i < 22; i++) {
+    const x = x0 + Math.random() * w;
+    const y = y0 + Math.random() * h;
+    const r = 6 + Math.random() * 10;
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.18 + Math.random() * 0.18})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, r, r * 0.35, Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Subtle vignette so the centre reads brighter than the edges.
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const r = Math.hypot(maxX - cx, maxY - cy);
+  const vg = ctx.createRadialGradient(cx, cy, r * 0.2, cx, cy, r * 1.4);
+  vg.addColorStop(0, "rgba(0, 0, 0, 0)");
+  vg.addColorStop(1, "rgba(0, 0, 0, 0.4)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(x0, y0, w, h);
+  ctx.restore();
+}
+
+// Joints between modular plastic track pieces. Faint perpendicular
+// hairlines across the asphalt every ~180 px of arc length, so the
+// circuit reads as snapped-together segments like a Scalextric set.
+function drawTrackSeams(ctx: CanvasRenderingContext2D, track: Track) {
+  const samples = track.center.length;
+  const SEAM_SPACING = 180;
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(60, 66, 80, 0.55)";
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = "butt";
+
+  let acc = 0;
+  for (let i = 0; i < samples; i++) {
+    const j = (i + 1) % samples;
+    const dx = track.center[j].x - track.center[i].x;
+    const dy = track.center[j].y - track.center[i].y;
+    const d = Math.hypot(dx, dy);
+    acc += d;
+    if (acc < SEAM_SPACING) continue;
+    acc = 0;
+    const t = track.tangents[i];
+    const n = perp(t);
+    const w = track.width;
+    const x1 = track.center[i].x + n.x * w;
+    const y1 = track.center[i].y + n.y * w;
+    const x2 = track.center[i].x - n.x * w;
+    const y2 = track.center[i].y - n.y * w;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
   }
   ctx.restore();
 }
