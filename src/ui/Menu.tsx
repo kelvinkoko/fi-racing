@@ -23,7 +23,7 @@ export default function Menu({ onEnter, onTimeTrial, initialRoom = "" }: Props) 
     <div className="menu">
       <div className="card">
         <h1>Fi Racing</h1>
-        <div className="sub">Top-down arcade racer · 2–4 players · serverless P2P</div>
+        <div className="sub">Top-down slot car racing — race friends on the same circuit</div>
 
         <div className="row">
           <input
@@ -57,7 +57,7 @@ export default function Menu({ onEnter, onTimeTrial, initialRoom = "" }: Props) 
         </div>
 
         <div className="row" style={{ marginTop: 16, color: "var(--muted)", fontSize: 13 }}>
-          Or paste a friend's link. Arrow keys / WASD to drive.
+          Or paste a friend's link to join their race.
         </div>
       </div>
     </div>
