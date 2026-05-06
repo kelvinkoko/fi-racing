@@ -168,22 +168,14 @@ function drawCurbs(ctx: CanvasRenderingContext2D, track: Track) {
     curvature[i] = a.x * b.y - a.y * b.x;
   }
 
-  // Cap the maximum curb length to keep tight corners from looking like
-  // the curb wraps the whole apex zone — F1 curbs are typically short
-  // strips focused on the apex itself.
-  const MAX_CURB_SAMPLES = 14;
-
   let i = 0;
   let segId = 0;
   while (i < samples) {
     const c = curvature[i];
-    if (Math.abs(c) > 0.22) {
+    if (Math.abs(c) > 0.18) {
       const sign = Math.sign(c);
       let j = i;
-      while (j < samples
-        && (j - i) < MAX_CURB_SAMPLES
-        && Math.sign(curvature[j]) === sign
-        && Math.abs(curvature[j]) > 0.12) j++;
+      while (j < samples && Math.sign(curvature[j]) === sign && Math.abs(curvature[j]) > 0.08) j++;
       drawCurbSegment(ctx, track, i, j, sign, segId++);
       i = j;
     } else {

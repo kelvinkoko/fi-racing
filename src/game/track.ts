@@ -19,46 +19,31 @@ export type Track = {
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
 };
 
-// Fukuoka city-tour layout. Clockwise loop visiting the famous landmarks
-// roughly in their real geographic order:
-//   south side  (Hakata → Canal City → Nakasu → Tenjin) — long start
-//                straight along the city's east-west main road
-//   south-west  (Ohori Park → Fukuoka Castle ruins detour)
-//   far west    (PayPay Dome → Fukuoka Tower)
-//   north side  (Momochi Beach → Hakata Bay coast — the back stretch)
-//   east return turn-in to the Hakata Station start straight
-//
-// Y is screen-down so "north" (the bay) is at NEGATIVE y, matching how
-// real maps print Fukuoka with the bay at the top of the page.
+// F1-style fictional layout. Hand-tuned control points form a flowing circuit:
+// long start straight, fast right kink, S-chicane, hairpin, sweeping double-apex,
+// returning down a back straight to the start.
 const CONTROL_POINTS: Vec2[] = [
-  // Start straight along Hakata–Tenjin (samples 0..3 colinear on y=0).
-  // Three points on y=0 ahead of the start guarantee a pure-west tangent
-  // through the whole grid section.
-  { x: 530,  y: 0    },  // 0  HAKATA STATION — start / finish
-  { x: 380,  y: 0    },  // 1
-  { x: 220,  y: 0    },  // 2  Canal City run
-  { x: 60,   y: 0    },  // 3  Nakasu / Tenjin run
-  // South dip down to the Castle ruins, then back north.
-  { x: -100, y: 30   },  // 4  Akasaka
-  { x: -240, y: 70   },  // 5  Ohori area
-  { x: -360, y: 170  },  // 6  FUKUOKA CASTLE (south detour apex)
-  { x: -520, y: 110  },  // 7
-  // West / north-west to the coast.
-  { x: -640, y: -10  },  // 8  PayPay Dome run
-  { x: -740, y: -150 },  // 9  Fukuoka Tower (far-west extreme)
-  { x: -680, y: -290 },  // 10 Momochi Beach (turn east onto bay)
-  // Bay-coast back stretch heading east.
-  { x: -480, y: -340 },  // 11
-  { x: -200, y: -360 },  // 12 Hakata Bay
-  { x: 60,   y: -360 },  // 13
-  { x: 320,  y: -340 },  // 14
-  { x: 520,  y: -270 },  // 15
-  // East-end hairpin: cars come in heading ESE, pivot south, then exit
-  // pointing west — onto the start straight without overshoot.
-  { x: 700,  y: -150 },  // 16 corner entry
-  { x: 800,  y: -40  },  // 17 corner apex (off-straight)
-  { x: 760,  y: 0    },  // 18 corner exit, just touching y=0
-  { x: 650,  y: 0    },  // 19 first colinear point on the start straight
+  { x: 0,    y: 0    }, // start/finish
+  { x: 600,  y: -20  },
+  { x: 950,  y: -120 }, // fast right kink
+  { x: 1200, y: -340 },
+  { x: 1320, y: -640 },
+  { x: 1180, y: -880 }, // entry to chicane
+  { x: 980,  y: -820 }, // chicane apex 1
+  { x: 880,  y: -640 }, // chicane apex 2
+  { x: 720,  y: -560 },
+  { x: 500,  y: -700 },
+  { x: 280,  y: -940 }, // approach hairpin
+  { x: 120,  y: -1080 },
+  { x: -120, y: -1060 }, // hairpin apex
+  { x: -260, y: -880 },
+  { x: -200, y: -640 }, // sweeping double-apex entry
+  { x: -380, y: -440 },
+  { x: -560, y: -300 },
+  { x: -680, y: -120 },
+  { x: -640, y: 80   },
+  { x: -440, y: 160  },
+  { x: -200, y: 120  },
 ];
 
 export type LandmarkIcon =
@@ -67,39 +52,15 @@ export type LandmarkIcon =
 
 export type Landmark = {
   name: string;
-  /** Where the icon + label should be drawn (in green / sea area near
-   *  the track, hand-tuned for readability). */
   pos: Vec2;
-  /** Anchor point on the track that the connector line points to so
-   *  the player can tell which segment each spot belongs to. */
   anchor: Vec2;
   icon: LandmarkIcon;
 };
 
-// Famous Fukuoka spots, positioned in the surrounding world so the
-// track passes by them like real city scenery. `anchor` stays for any
-// future use (mini-map etc.), `pos` is the world-space spot where the
-// building silhouette is rendered into the cached track art.
-export const LANDMARKS: Landmark[] = [
-  // South-side city scenery: cars run west along the start straight
-  // with this row of buildings on their left.
-  { name: "Hakata Stn",     icon: "station", anchor: { x: 530,  y: 0    }, pos: { x: 530,  y: 160  } },
-  { name: "Canal City",     icon: "canal",   anchor: { x: 380,  y: 0    }, pos: { x: 380,  y: 160  } },
-  { name: "Nakasu",         icon: "nakasu",  anchor: { x: 220,  y: 0    }, pos: { x: 220,  y: 160  } },
-  { name: "Tenjin",         icon: "tenjin",  anchor: { x: 60,   y: 0    }, pos: { x: 60,   y: 160  } },
-  // South detour: park sits inside the loop, castle sits south of the
-  // detour apex like the real Maizuru Park location.
-  { name: "Ohori Park",     icon: "ohori",   anchor: { x: -240, y: 70   }, pos: { x: -160, y: -130 } },
-  { name: "Fukuoka Castle", icon: "castle",  anchor: { x: -360, y: 170  }, pos: { x: -360, y: 290  } },
-  // West side: dome sits inland of the corner, tower sits past the
-  // coast at the western extreme.
-  { name: "PayPay Dome",    icon: "dome",    anchor: { x: -640, y: -10  }, pos: { x: -560, y: 130  } },
-  { name: "Fukuoka Tower",  icon: "tower",   anchor: { x: -740, y: -150 }, pos: { x: -880, y: -150 } },
-  // North side (sea): beach + bay scenery sits north of the back
-  // stretch.
-  { name: "Momochi Beach",  icon: "beach",   anchor: { x: -680, y: -290 }, pos: { x: -780, y: -460 } },
-  { name: "Hakata Bay",     icon: "bay",     anchor: { x: -100, y: -360 }, pos: { x: -100, y: -490 } },
-];
+// Landmarks are off for the basic Circuit Alpha layout. The Fukuoka tour
+// version lived here briefly; keeping the type + icon helpers around so
+// it's easy to switch back later.
+export const LANDMARKS: Landmark[] = [];
 
 export function buildTrack(width = 60): Track {
   const { points: center, tangents } = sampleClosedCatmullRom(CONTROL_POINTS, 28);
@@ -143,7 +104,7 @@ export function buildTrack(width = 60): Track {
   }
 
   return {
-    name: "Fukuoka Street Circuit",
+    name: "Circuit Alpha",
     width,
     center,
     tangents,
