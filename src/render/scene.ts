@@ -85,126 +85,131 @@ function drawCar(ctx: CanvasRenderingContext2D, car: CarVisual) {
   }
   if (car.desloted) ctx.globalAlpha = 0.7;
 
-  drawF1Body(ctx, car.color, !!car.braking);
+  drawGTBody(ctx, car.color, !!car.braking);
 
   ctx.shadowBlur = 0;
 
   ctx.restore();
 }
 
-// Draw an F1-style car oriented along +x (nose pointing in the direction
-// of travel). Total footprint roughly 44 long × 22 wide including the
-// front wing. Silhouette is deliberately rear-wide / nose-narrow so the
-// orientation reads at a glance from a top-down view.
-function drawF1Body(ctx: CanvasRenderingContext2D, color: string, braking: boolean) {
+// Draw a GT-style car (Le Mans / Gran Turismo silhouette) oriented with
+// the nose along +x. Total footprint roughly 40 long × 22 wide
+// including the rear spoiler endplates.
+function drawGTBody(ctx: CanvasRenderingContext2D, color: string, braking: boolean) {
   const lighter = lighten(color, 0.22);
-  const darker = darken(color, 0.22);
+  const darker  = darken(color, 0.22);
 
-  // Wheels first (drawn under body). Rear wheels are larger.
-  drawWheel(ctx, -10, -9, 1.0);
-  drawWheel(ctx,  10, -9, 0.85);
-  drawWheel(ctx, -10,  9, 1.0);
-  drawWheel(ctx,  10,  9, 0.85);
-
-  // Sidepods + chassis silhouette: WIDE at the rear, tapering forward to
-  // a thin nose cone that extends past the front wheels.
-  ctx.beginPath();
-  ctx.moveTo(-15, -6);   // rear of engine cover (left)
-  ctx.lineTo(-6, -8);    // sidepod widest mid-rear (left)
-  ctx.lineTo(2, -6);     // narrowing toward cockpit
-  ctx.lineTo(8, -3);     // shoulder of nose cone
-  ctx.lineTo(17, -1.4);  // nose tapering
-  ctx.lineTo(20, 0);     // nose tip
-  ctx.lineTo(17, 1.4);
-  ctx.lineTo(8, 3);
-  ctx.lineTo(2, 6);
-  ctx.lineTo(-6, 8);
-  ctx.lineTo(-15, 6);
-  ctx.closePath();
-  const grad = ctx.createLinearGradient(0, -8, 0, 8);
-  grad.addColorStop(0, lighter);
-  grad.addColorStop(0.5, color);
-  grad.addColorStop(1, darker);
-  ctx.fillStyle = grad;
+  // Cast shadow underneath the chassis
+  ctx.fillStyle = "rgba(0,0,0,0.42)";
+  roundRect(ctx, -17, -10 + 1.5, 36, 20, 6);
   ctx.fill();
 
-  // Engine cover spine (subtle dark stripe down the back half).
-  ctx.fillStyle = darker;
-  ctx.beginPath();
-  ctx.moveTo(-15, -2.5);
-  ctx.lineTo(-2, -2);
-  ctx.lineTo(0, 0);
-  ctx.lineTo(-2, 2);
-  ctx.lineTo(-15, 2.5);
-  ctx.closePath();
+  // Main body — rounded enclosed chassis (no exposed wheels)
+  const bodyGrad = ctx.createLinearGradient(0, -10, 0, 10);
+  bodyGrad.addColorStop(0,    lighter);
+  bodyGrad.addColorStop(0.5,  color);
+  bodyGrad.addColorStop(1,    darker);
+  ctx.fillStyle = bodyGrad;
+  roundRect(ctx, -18, -10, 36, 20, 6);
   ctx.fill();
 
-  // Cockpit + halo (positioned slightly behind centre, in front of the
-  // sidepods).
+  // Wheel-arch shading (subtle dark patches over the four fender areas)
+  ctx.fillStyle = "rgba(0,0,0,0.30)";
+  ctx.fillRect(8,   -10,  6, 1.6); // front-left arch
+  ctx.fillRect(8,    8.4, 6, 1.6); // front-right arch
+  ctx.fillRect(-14, -10,  6, 1.6); // rear-left
+  ctx.fillRect(-14,  8.4, 6, 1.6); // rear-right
+
+  // Greenhouse base — dark cabin shape
   ctx.fillStyle = "#1a1f2b";
-  ctx.beginPath();
-  ctx.ellipse(-1, 0, 3.6, 2.8, 0, 0, Math.PI * 2);
+  roundRect(ctx, -10, -7, 18, 14, 3.5);
   ctx.fill();
-  ctx.strokeStyle = "rgba(220, 226, 235, 0.55)";
-  ctx.lineWidth = 0.8;
+
+  // Windshield (front of greenhouse)
+  ctx.fillStyle = "rgba(180, 220, 240, 0.45)";
+  ctx.beginPath();
+  ctx.moveTo(8,   -6);
+  ctx.lineTo(2,   -6.6);
+  ctx.lineTo(2,    6.6);
+  ctx.lineTo(8,    6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Rear window
+  ctx.fillStyle = "rgba(180, 220, 240, 0.28)";
+  ctx.beginPath();
+  ctx.moveTo(-2, -6.6);
+  ctx.lineTo(-9, -6);
+  ctx.lineTo(-9,  6);
+  ctx.lineTo(-2,  6.6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Roof number disc (a la GT3 car number rondel)
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.beginPath();
+  ctx.arc(-3, 0, 3.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.35)";
+  ctx.lineWidth = 0.6;
   ctx.stroke();
-  // Helmet stripe — clearly forward-of-centre on the cockpit.
-  ctx.fillStyle = lighten(color, 0.45);
-  ctx.fillRect(-1.5, -1, 2, 2);
 
-  // Mirrors just ahead of cockpit shoulders.
-  ctx.fillStyle = "#0d0f14";
-  ctx.fillRect(2, -5.5, 1.4, 1);
-  ctx.fillRect(2, 4.5, 1.4, 1);
+  // Hood lines (subtle vents / panel gaps)
+  ctx.strokeStyle = "rgba(0,0,0,0.25)";
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(9,  -4); ctx.lineTo(15, -4);
+  ctx.moveTo(9,   4); ctx.lineTo(15,  4);
+  ctx.stroke();
 
-  // Front wing — wide, sits at the very front past the nose tip.
-  ctx.fillStyle = "#e8ecf3";
-  roundRect(ctx, 18, -10, 4, 20, 1.2);
+  // Headlights — bright clusters at the front corners
+  ctx.fillStyle = "rgba(255, 240, 200, 0.95)";
+  roundRect(ctx, 15.5, -8.5, 2.5, 2.6, 0.5);
   ctx.fill();
-  ctx.fillStyle = color;
-  ctx.fillRect(18, -10.5, 4, 1.5); // top endplate strip
-  ctx.fillRect(18, 9, 4, 1.5);     // bottom endplate strip
+  roundRect(ctx, 15.5,  5.9, 2.5, 2.6, 0.5);
+  ctx.fill();
 
-  // Rear wing — narrower than the front wing so the silhouette tapers
-  // visibly from rear to nose.
+  // Front grille (small slot in centre of nose)
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  roundRect(ctx, 16.5, -2.6, 1.6, 5.2, 0.5);
+  ctx.fill();
+
+  // Side mirrors mounted just outside the A-pillars
+  ctx.fillStyle = darker;
+  roundRect(ctx, 6, -10.8, 2, 1.4, 0.5);
+  ctx.fill();
+  roundRect(ctx, 6,  9.4, 2, 1.4, 0.5);
+  ctx.fill();
+
+  // Door cut-line on each side
+  ctx.strokeStyle = "rgba(0,0,0,0.35)";
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -10); ctx.lineTo(0, -7);
+  ctx.moveTo(0,  10); ctx.lineTo(0,  7);
+  ctx.stroke();
+
+  // Rear spoiler — slim element across the back, with team-colour
+  // endplate caps.
   ctx.fillStyle = "#1a1f2b";
-  ctx.fillRect(-18.5, -7, 1.4, 14); // upright beam
-  ctx.fillStyle = "#e8ecf3";
-  ctx.fillRect(-17, -6, 0.8, 12);   // light upper element
+  ctx.fillRect(-19, -10, 2, 20);
   ctx.fillStyle = color;
-  ctx.fillRect(-19.5, -7.5, 1.6, 3); // tiny endplate (top-left)
-  ctx.fillRect(-19.5, 4.5, 1.6, 3);  // tiny endplate (bottom-left)
+  ctx.fillRect(-20, -10.5, 1.5, 3);
+  ctx.fillRect(-20,  7.5,  1.5, 3);
 
-  // Brake light on the rear-wing centerline. Bright red with a glow when
-  // the player is on the brake; dim when off so the position is still
-  // visible at a glance.
+  // Taillights — bright red when braking, dim wine when not.
   if (braking) {
     ctx.shadowColor = "rgba(255, 60, 80, 0.95)";
     ctx.shadowBlur = 10;
     ctx.fillStyle = "#ff3344";
-    ctx.fillRect(-17.6, -2, 1.4, 4);
-    ctx.shadowBlur = 0;
   } else {
-    ctx.fillStyle = "#5a1a22";
-    ctx.fillRect(-17.6, -2, 1.4, 4);
+    ctx.fillStyle = "#7a1a26";
   }
-}
-
-function drawWheel(ctx: CanvasRenderingContext2D, x: number, y: number, scale = 1) {
-  const w = 8 * scale;     // along x (rolling direction)
-  const h = 3.6 * scale;   // tyre thickness
-  // Tyre
-  ctx.fillStyle = "#0c0d11";
-  roundRect(ctx, x - w / 2, y - h / 2, w, h, 1.4);
+  roundRect(ctx, -17.5, -8,  1.6, 2.5, 0.4);
   ctx.fill();
-  // Sidewall highlight
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
-  ctx.fillRect(x - w / 2 + 1, y - h / 2 + 0.4, w - 2, 0.6);
-  // Hub
-  ctx.fillStyle = "#3a3f4d";
-  ctx.beginPath();
-  ctx.ellipse(x, y, 1.2, 0.9, 0, 0, Math.PI * 2);
+  roundRect(ctx, -17.5,  5.5, 1.6, 2.5, 0.4);
   ctx.fill();
+  ctx.shadowBlur = 0;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
