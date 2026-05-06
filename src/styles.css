@@ -391,6 +391,12 @@ input[type="text"]:focus { border-color: var(--accent-2); }
   border: 2px solid #2bd4ff;
   font-size: 22px;
 }
+.race-tip.outer {
+  background: rgba(54, 211, 153, 0.88);
+  color: #06231a;
+  border: 2px solid #66e9bf;
+  font-size: 20px;
+}
 @keyframes tip-pulse {
   from { transform: translate(-50%, 0) scale(1);    opacity: 0.92; }
   to   { transform: translate(-50%, 0) scale(1.06); opacity: 1; }

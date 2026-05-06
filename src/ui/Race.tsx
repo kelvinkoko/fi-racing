@@ -82,7 +82,7 @@ export default function Race({ net, voice, onExit, timeTrial, totalLaps }: Props
     speed: 0, maxSafe: 0, lane: 1, warning: false, desloted: false, blocked: false,
     laneSafe: [0, 0, 0], finished: false
   });
-  const [tip, setTip] = useState<{ kind: "brake" | "lane"; text: string } | null>(null);
+  const [tip, setTip] = useState<{ kind: "brake" | "lane" | "outer"; text: string } | null>(null);
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   const [countdown, setCountdown] = useState<string | null>(null);
   const [ranking, setRanking] = useState<RankRow[]>([]);
@@ -209,6 +209,9 @@ export default function Race({ net, voice, onExit, timeTrial, totalLaps }: Props
     let hudTick = 0;
     let blockedFor = 0;          // seconds the player has been blocked w/o switching lane
     let prevLaneTarget = 1;
+    let firstDeslotShown = false;     // becomes true after the first ever deslot tip
+    let outerTipUntil = 0;             // performance.now() until which the outer-lane tip shows
+    let lastProactiveOuter = 0;        // last time the proactive outer hint was shown
 
     // Engine audio: needs a user gesture before AudioContext will play.
     const initAudioOnGesture = () => {
@@ -426,6 +429,7 @@ export default function Race({ net, voice, onExit, timeTrial, totalLaps }: Props
         void id;
       }
       const seenIds: string[] = [];
+      const localId = net?.selfId ?? "local";
       const deslotCheck = (id: string, isDesloted: boolean, x: number, y: number, color: string) => {
         seenIds.push(id);
         const prev = prevDeslotState.get(id) ?? false;
@@ -436,6 +440,13 @@ export default function Race({ net, voice, onExit, timeTrial, totalLaps }: Props
             sizeMin: 1, sizeMax: 2.6,
             color: (i) => i % 3 === 0 ? color : (i % 3 === 1 ? "#ffd23f" : "#ff8a3a")
           });
+          // Teach the outer-lane lesson the very first time the local
+          // player flies off — they just felt the cost of pushing too
+          // hard, so the explanation lands.
+          if (id === localId && !firstDeslotShown) {
+            firstDeslotShown = true;
+            outerTipUntil = performance.now() + 4500;
+          }
         }
         prevDeslotState.set(id, isDesloted);
       };
@@ -538,13 +549,28 @@ export default function Race({ net, voice, onExit, timeTrial, totalLaps }: Props
         const rank = buildRanking(isMultiplayer, isHost, hostState, clientView, lapState, players, localCar, track.totalLength, lapCount, net?.selfId);
         setRanking(rank);
 
-        // Pick a tutorial prompt: brake takes priority over lane.
-        let nextTip: { kind: "brake" | "lane"; text: string } | null = null;
-        if (data && started && !data.finished && !data.desloted) {
-          if (data.maxSafe > 0 && data.speed > data.maxSafe + 25) {
-            nextTip = { kind: "brake", text: "BRAKE!" };
-          } else if (data.blocked && blockedFor > 1.5) {
-            nextTip = { kind: "lane", text: "TAP LANE TO PASS" };
+        // Pick a tutorial prompt. Priority:
+        //   1. Just-deslotted-for-the-first-time → explain outer-lane grip.
+        //   2. Currently over the safe limit → BRAKE!
+        //   3. On a worse lane than another with a meaningful margin → OUTER LANE.
+        //   4. Stuck in traffic → TAP LANE TO PASS.
+        let nextTip: { kind: "brake" | "lane" | "outer"; text: string } | null = null;
+        const now2 = performance.now();
+        if (data && started && !data.finished) {
+          if (now2 < outerTipUntil) {
+            nextTip = { kind: "outer", text: "TRY THE OUTER LANE — MORE GRIP" };
+          } else if (!data.desloted) {
+            if (data.maxSafe > 0 && data.speed > data.maxSafe + 25) {
+              nextTip = { kind: "brake", text: "BRAKE!" };
+            } else if (
+              shouldShowOuterHint(data) &&
+              now2 - lastProactiveOuter > 6000
+            ) {
+              nextTip = { kind: "outer", text: "OUTER LANE = MORE GRIP" };
+              lastProactiveOuter = now2;
+            } else if (data.blocked && blockedFor > 1.5) {
+              nextTip = { kind: "lane", text: "TAP LANE TO PASS" };
+            }
           }
         }
         setTip(nextTip);
@@ -776,6 +802,21 @@ function speedBarColor(h: HudData): string {
   return "#36d399";
 }
 
+// Should we be nudging the player toward a different (outer) lane? Fires
+// when their current lane's safe-speed is meaningfully worse than the
+// best other lane AND they're already pressing close to the current
+// lane's limit — i.e. switching would actually help right now.
+function shouldShowOuterHint(h: HudData): boolean {
+  const me = h.laneSafe[h.lane];
+  if (!me) return false;
+  let bestOther = 0;
+  for (let i = 0; i < h.laneSafe.length; i++) {
+    if (i === h.lane) continue;
+    if (h.laneSafe[i] > bestOther) bestOther = h.laneSafe[i];
+  }
+  return bestOther > me * 1.25 && h.speed > me * 0.85;
+}
+
 // Colour a lane pip by how this lane's safe speed compares to the player's
 // current speed. Red = you would fly off if you switched here, yellow =
 // close to the limit, green = comfortable. With the lane pips shown side
@@ -797,7 +838,7 @@ function pickHudData(
   track: Track, lapCount: number, selfId?: string
 ): HudData | null {
   // Look ~1 second of top-speed travel ahead so the player has time to brake.
-  const lookaheadDist = 500;
+  const lookaheadDist = 700;
   const safeFromProgress = (p: number, lane: number) => {
     const k = lookaheadMaxCurvature(track, p, lookaheadDist, lane);
     return Math.round(maxSafeSpeedFor(k));

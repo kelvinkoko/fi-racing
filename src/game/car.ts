@@ -10,28 +10,28 @@ export const SLOT = {
   // Acceleration / drag tuned so the car reaches ~90% of top speed in ~4s
   // (snappier than a real F1 to keep the arcade feel) but won't reach
   // hairpin speeds without braking.
-  accel: 300,
-  brake: 330,            // softer brakes to encourage feathering / trail-braking
+  accel: 410,
+  brake: 450,            // softer brakes to encourage feathering / trail-braking
   drag: 0.40,
   rollingFriction: 35,
-  topSpeed: 620,         // ≈ 341 km/h (PX_PER_METER = 6.55)
+  topSpeed: 850,         // visibly fast on screen; ≈ 340 km/h after rescaling KMH_PER_PX_S
   slipstreamBonus: 0.10, // +10 % top speed while drafting a car ahead
-  // Lateral acceleration ceiling. Scaled up with topSpeed² so corner
-  // safe-speeds stay in the same proportion (still need to brake from
-  // top speed for tight stuff, still get the +30 % outer-lane grip on
-  // top of geometry).
-  maxCentripetal: 2100,
+  // Lateral acceleration ceiling. Scaled with topSpeed² so corner safe-
+  // speeds stay in the same proportion of top speed.
+  maxCentripetal: 3950,
   warnRatio: 0.6,
   laneSwitchRate: 1.4,
   deslotDuration: 2.4,
-  respawnSpeed: 65,
+  respawnSpeed: 90,
 };
 
-// World scale chosen so SLOT.topSpeed (620 px/s) maps to ~341 km/h —
-// inside the realistic F1 envelope (typical race max 320–340 km/h, all-
-// time records around 380). One sim pixel ≈ 0.153 m (≈ 6.55 px / m).
-export const PX_PER_METER = 6.55;
-export const KMH_PER_PX_S = 3.6 / PX_PER_METER; // ≈ 0.55
+// World scale chosen so SLOT.topSpeed (850 px/s) maps to ~340 km/h —
+// inside the realistic F1 envelope. Bumping topSpeed higher than the
+// previous tuning while pulling the km/h-per-pixel ratio down means
+// the car covers more screen pixels per second (visibly faster) without
+// the HUD numbers blowing past F1 reality.
+export const PX_PER_METER = 9.0;
+export const KMH_PER_PX_S = 3.6 / PX_PER_METER; // 0.40
 
 export type CarInput = {
   throttle: number; // 0..1
