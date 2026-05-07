@@ -5,7 +5,10 @@ Two to four players join the same race by sharing a link or scanning a QR code.
 There is no backend server — peers find each other through public BitTorrent
 trackers and then exchange game traffic directly over WebRTC.
 
-Live build: deployed to GitHub Pages from the `main` branch.
+**▶ Play it now: <https://kelvinkoko.github.io/fi-racing/>**
+
+Open the link, click **Create race** and share the URL (or QR code in the lobby)
+with up to three friends. Or click **Time trial** for a solo hot-lap session.
 
 ## Features
 
