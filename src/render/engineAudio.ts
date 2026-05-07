@@ -41,7 +41,9 @@ export function initEngineAudio() {
 
 // speedRatio in [0,1] (current speed / top speed including any boost).
 // throttle in [0,1].
-export function updateEngineAudio(speedRatio: number, throttle: number) {
+// active: when false, the engine is silenced (race finished, parked at
+// the line, before lights out, etc.).
+export function updateEngineAudio(speedRatio: number, throttle: number, active: boolean = true) {
   if (!ctx || !osc || !gain || !filter) return;
   const t = Math.max(0, Math.min(1, speedRatio));
   // Engine note climbs from ~70 Hz at idle to ~360 Hz at top speed.
@@ -50,10 +52,11 @@ export function updateEngineAudio(speedRatio: number, throttle: number) {
   // Filter opens up with speed for a bit of brightness on the straight.
   const cutoff = 700 + 1800 * t;
   filter.frequency.setTargetAtTime(cutoff, ctx.currentTime, 0.08);
-  // Volume rests at a low idle and lifts with throttle so the player hears
+  // Volume: silent unless the engine is meant to be running. Otherwise
+  // rests at a low idle and lifts with throttle so the player hears
   // the gas/lift cadence — capped low so the synth doesn't get fatiguing.
-  const target = 0.04 + 0.10 * Math.max(throttle, 0.15 * t);
-  gain.gain.setTargetAtTime(target, ctx.currentTime, 0.06);
+  const target = active ? (0.04 + 0.10 * Math.max(throttle, 0.15 * t)) : 0;
+  gain.gain.setTargetAtTime(target, ctx.currentTime, active ? 0.06 : 0.10);
 }
 
 export function stopEngineAudio() {

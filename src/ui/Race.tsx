@@ -418,8 +418,21 @@ export default function Race({ net, voice, onExit, timeTrial, totalLaps }: Props
         }
       }
 
-      // Engine audio for the local player.
-      updateEngineAudio(localSpeed / SLOT.topSpeed, localThrottle);
+      // Engine audio. Cut to silence when the race is over, before
+      // lights-out, or when the car is just parked (no speed and no
+      // throttle) — otherwise it's an annoying idle hum.
+      const localFinished = (() => {
+        if (!isMultiplayer) return lapState.finished;
+        if (isHost && hostState) {
+          return hostState.raceOver || (hostState.laps.get(net!.selfId)?.finished ?? false);
+        }
+        if (clientView) {
+          return clientView.finished || (clientView.laps.get(net!.selfId)?.finished ?? false);
+        }
+        return false;
+      })();
+      const engineActive = started && !localFinished && (localSpeed > 5 || localThrottle > 0.05);
+      updateEngineAudio(localSpeed / SLOT.topSpeed, localThrottle, engineActive);
 
       // Detect freshly-desloted cars and pop a spark burst at the impact.
       for (const c of cars) {
